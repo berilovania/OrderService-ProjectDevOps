@@ -1,219 +1,302 @@
-# Order Service
+# Order Service — Pipeline DevOps Completo
 
-API REST de gerenciamento de pedidos com pipeline DevOps completo — do código ao deploy automatizado em nuvem.
+Pipeline CI/CD de ponta a ponta com containerização Docker, orquestração Kubernetes e deploy automatizado em nuvem AWS. Do `git push` à produção em minutos, sem intervenção manual.
 
-## Sobre o Projeto
+---
 
-O **Order Service** é uma aplicação de gerenciamento de pedidos que cobre todo o ciclo DevOps: desenvolvimento, containerização, orquestração e entrega contínua. A API permite criar, listar, atualizar e cancelar pedidos, com persistência em PostgreSQL, métricas Prometheus, dashboard interativo e deploy automatizado em Kubernetes via GitHub Actions.
+## 1. Visão Geral do Projeto
 
-## Tecnologias
+Este projeto implementa um **pipeline DevOps completo e funcional**, cobrindo todas as etapas do ciclo de vida de entrega de software: versionamento, integração contínua, containerização, registro de imagens, orquestração e deploy automatizado em ambiente cloud real.
 
-| Camada | Tecnologia |
+A aplicação — uma API REST de gerenciamento de pedidos construída com FastAPI — serve como **carga de trabalho para validar a infraestrutura**. O foco do projeto não está na lógica de negócio, mas sim na demonstração prática de:
+
+- **Automação completa** — zero intervenção manual entre o commit e a produção
+- **Infraestrutura como código** — manifests Kubernetes versionados no repositório
+- **Deploy real em nuvem** — cluster Kubernetes rodando em instância AWS EC2
+- **Boas práticas de containerização** — imagem Docker otimizada com multi-stage build
+- **Observabilidade** — métricas Prometheus, health checks e probes de liveness/readiness
+
+---
+
+## 2. Arquitetura
+
+O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte da verdade, e qualquer alteração na branch `main` dispara automaticamente o pipeline completo.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        FLUXO DE ENTREGA                              │
+│                                                                      │
+│   Developer                                                          │
+│      │                                                               │
+│      ▼                                                               │
+│   git push (main)                                                    │
+│      │                                                               │
+│      ▼                                                               │
+│   ┌─────────────────────────────────────┐                            │
+│   │        GitHub Actions (CI/CD)       │                            │
+│   │                                     │                            │
+│   │  1. Checkout do código              │                            │
+│   │  2. Build da imagem Docker          │                            │
+│   │  3. Push para GHCR (tag: SHA)       │                            │
+│   │  4. Copia manifests para EC2 (SCP)  │                            │
+│   │  5. Deploy via SSH + kubectl        │                            │
+│   └──────────────────┬──────────────────┘                            │
+│                      │                                               │
+│                      ▼                                               │
+│   ┌──────────────────────────────────────────────┐                   │
+│   │            AWS EC2 (Ubuntu 22.04)            │                   │
+│   │                                              │                   │
+│   │   ┌──────────────────────────────────────┐   │                   │
+│   │   │          Cluster k3s                 │   │                   │
+│   │   │                                      │   │                   │
+│   │   │   ┌────────────────────────────┐     │   │                   │
+│   │   │   │   order-service (2 pods)   │     │   │                   │
+│   │   │   │   porta 8000               │     │   │                   │
+│   │   │   │   liveness + readiness     │     │   │                   │
+│   │   │   └────────────┬───────────────┘     │   │                   │
+│   │   │                │                     │   │                   │
+│   │   │                ▼                     │   │                   │
+│   │   │   ┌────────────────────────────┐     │   │                   │
+│   │   │   │   PostgreSQL 16 (1 pod)    │     │   │                   │
+│   │   │   │   PVC 1Gi persistente      │     │   │                   │
+│   │   │   │   porta 5432 (ClusterIP)   │     │   │                   │
+│   │   │   └────────────────────────────┘     │   │                   │
+│   │   │                                      │   │                   │
+│   │   └──────────────────────────────────────┘   │                   │
+│   │                                              │                   │
+│   │   NodePort :30080 ──► :8000                  │                   │
+│   └──────────────────────────────────────────────┘                   │
+│                                                                      │
+│   Usuário ──► http://<EC2_IP>:30080                                  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Componentes e responsabilidades:**
+
+| Componente | Papel |
+|------------|-------|
+| **GitHub** | Versionamento do código e dos manifests Kubernetes |
+| **GitHub Actions** | Orquestra o pipeline CI/CD (build, push, deploy) |
+| **Docker** | Empacota a aplicação em imagem reproduzível |
+| **GHCR** | Armazena as imagens Docker versionadas por commit SHA |
+| **k3s** | Distribuição leve do Kubernetes que roda no EC2 |
+| **PostgreSQL** | Persistência de dados com volume Kubernetes |
+| **AWS EC2** | Infraestrutura cloud onde o cluster é executado |
+
+---
+
+## 3. Stack de Tecnologias
+
+| Categoria | Tecnologia | Função |
+|-----------|-----------|--------|
+| **Linguagem** | Python 3.12 | Runtime da aplicação |
+| **Framework** | FastAPI (async) | API REST de alta performance |
+| **Banco de Dados** | PostgreSQL 16 + SQLAlchemy async + asyncpg | Persistência com queries assíncronas |
+| **Containerização** | Docker (multi-stage build) | Empacotamento e isolamento da aplicação |
+| **Orquestração** | Kubernetes (k3s) | Gerenciamento de containers em produção |
+| **CI/CD** | GitHub Actions | Automação do pipeline de entrega |
+| **Registry** | GitHub Container Registry (GHCR) | Armazenamento de imagens Docker |
+| **Monitoramento** | Prometheus (prometheus-fastapi-instrumentator) | Coleta de métricas da aplicação |
+| **Cloud** | AWS EC2 (Ubuntu 22.04) | Hospedagem do cluster Kubernetes |
+| **Versionamento** | Git + GitHub | Controle de código e colaboração |
+
+---
+
+## 4. Pipeline CI/CD
+
+O pipeline é definido em `.github/workflows/deploy.yml` e executa automaticamente a cada push na branch `main`.
+
+### Trigger
+
+```yaml
+on:
+  push:
+    branches: [main]
+```
+
+### Etapas do Pipeline
+
+```
+Checkout ──► Login GHCR ──► Build + Push ──► Copia manifests ──► Deploy na EC2
+```
+
+**1. Checkout do código**
+O GitHub Actions clona o repositório na máquina virtual do runner usando `actions/checkout@v4`.
+
+**2. Autenticação no GHCR**
+Realiza login no GitHub Container Registry utilizando o `GITHUB_TOKEN` gerado automaticamente, sem necessidade de credenciais adicionais.
+
+**3. Build e Push da imagem Docker**
+Constrói a imagem usando `docker/build-push-action@v6` e publica no GHCR com duas tags:
+- `ghcr.io/<owner>/orderservice-projectdevops:<commit-sha>` — versionamento imutável
+- `ghcr.io/<owner>/orderservice-projectdevops:latest` — referência para a versão mais recente
+
+**4. Copia manifests para a EC2**
+Transfere o diretório `k8s/` via SCP para a instância EC2, garantindo que os manifests estejam atualizados.
+
+**5. Deploy no Kubernetes**
+Conecta na EC2 via SSH e executa:
+- Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`, `__DB_PASSWORD__`)
+- `kubectl apply` em todos os manifests (namespace, secrets, volumes, deployments, services)
+- `kubectl set image` para atualizar a imagem do deployment com o SHA do commit
+- `kubectl rollout status` para aguardar a conclusão do deploy (timeout: 120s)
+
+### Secrets necessários
+
+| Secret | Descrição |
 |--------|-----------|
-| **Linguagem** | Python 3.12 |
-| **Framework** | FastAPI (async) |
-| **Banco de dados** | PostgreSQL 16 + SQLAlchemy (async) + asyncpg |
-| **Containerização** | Docker (multi-stage build) |
-| **Orquestração** | Kubernetes (k3s) |
-| **CI/CD** | GitHub Actions |
-| **Registry** | GitHub Container Registry (GHCR) |
-| **Monitoramento** | Prometheus (via prometheus-fastapi-instrumentator) |
-| **Cloud** | AWS EC2 (Ubuntu 22.04) |
+| `EC2_HOST` | Elastic IP da instância EC2 |
+| `EC2_SSH_KEY` | Chave privada SSH (conteúdo do `.pem`) |
+| `DB_PASSWORD` | Senha do PostgreSQL para o cluster |
 
-## Arquitetura
+> O `GITHUB_TOKEN` é provido automaticamente pelo GitHub Actions com permissões de `contents: read` e `packages: write`.
 
-```
-                         ┌──────────────┐
-                         │  git push    │
-                         │  (main)      │
-                         └──────┬───────┘
-                                │
-                                ▼
-                     ┌─────────────────────┐
-                     │   GitHub Actions    │
-                     │                     │
-                     │  1. Build imagem    │
-                     │  2. Push → GHCR    │
-                     │  3. SSH na EC2     │
-                     │  4. kubectl apply  │
-                     └─────────┬───────────┘
-                               │
-                               ▼
-                  ┌───────────────────────────┐
-                  │      EC2 (k3s)            │
-                  │                           │
-                  │  ┌─────────────────────┐  │
-                  │  │  order-service      │  │
-                  │  │  (2 réplicas)       │  │
-                  │  │  porta 8000         │  │
-                  │  └────────┬────────────┘  │
-                  │           │               │
-                  │           ▼               │
-                  │  ┌─────────────────────┐  │
-                  │  │  PostgreSQL 16      │  │
-                  │  │  (1 réplica + PVC)  │  │
-                  │  │  porta 5432         │  │
-                  │  └─────────────────────┘  │
-                  │                           │
-                  │  NodePort :30080 → :8000  │
-                  └───────────────────────────┘
+---
+
+## 5. Docker
+
+### Containerização da aplicação
+
+A aplicação é empacotada usando um **Dockerfile multi-stage**, que separa o ambiente de build do ambiente de execução:
+
+```dockerfile
+# Stage 1: instala dependências em um ambiente de build
+FROM python:3.12-slim AS builder
+WORKDIR /build
+COPY app/requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: copia apenas os artefatos necessários para a imagem final
+FROM python:3.12-slim
+WORKDIR /project
+COPY --from=builder /install /usr/local
+COPY app/ app/
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## Funcionalidades
+### Benefícios da abordagem
 
-### API REST completa
-- **Criar pedido** — recebe cliente, itens e valor total, gera UUID e timestamp automaticamente
-- **Listar pedidos** — paginação com `skip` e `limit`, ordenado por data (mais recente primeiro)
-- **Buscar por ID** — retorna um pedido específico pelo UUID
-- **Atualizar status** — transição de status: `created → processing → completed`
-- **Cancelar pedido** — marca o pedido como `cancelled` (pedidos cancelados não aceitam mais atualizações)
+- **Imagem leve** — a imagem final não contém ferramentas de build, headers de compilação ou cache do pip
+- **Reprodutibilidade** — o mesmo Dockerfile gera imagens idênticas em qualquer ambiente
+- **Portabilidade** — a imagem roda em qualquer host com Docker, do laptop do desenvolvedor ao cluster Kubernetes
+- **Segurança** — superfície de ataque reduzida por não incluir pacotes desnecessários
 
-### Dashboard web interativo
-- Interface customizada em `/` com listagem de pedidos em tempo real (polling a cada 8s)
-- Cards de estatísticas: total, criados, processando, concluídos
-- Criação de pedidos de teste direto pelo dashboard
-- Paginação client-side (10 pedidos por página)
-- Tema claro/escuro com persistência no `localStorage`
-- Internacionalização PT-BR / EN
+### Desenvolvimento local com Docker Compose
 
-### Documentação interativa
-- Swagger UI customizado em `/docs` com tema integrado (claro/escuro)
-- Permite testar todos os endpoints diretamente pelo navegador
+O `docker-compose.yml` orquestra a aplicação junto com o PostgreSQL para desenvolvimento:
 
-### Monitoramento
-- Métricas Prometheus em `/metrics` (latência, contagem de requests, status codes)
-- Health check em `/health` com verificação de conectividade ao banco
-
-### Limpeza automática
-- Task em background que roda a cada hora e remove pedidos com mais de 24h (configurável via `DATA_RETENTION_HOURS`)
-
-## Endpoints da API
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET` | `/` | Dashboard web |
-| `GET` | `/health` | Health check (verifica conexão com o banco) |
-| `GET` | `/metrics` | Métricas Prometheus |
-| `GET` | `/docs` | Swagger UI customizado |
-| `POST` | `/orders` | Criar pedido |
-| `GET` | `/orders` | Listar pedidos (`?skip=0&limit=50`) |
-| `GET` | `/orders/{id}` | Buscar pedido por ID |
-| `PATCH` | `/orders/{id}/status` | Atualizar status |
-| `DELETE` | `/orders/{id}` | Cancelar pedido |
-
-### Exemplo de uso
-
-**Criar um pedido:**
 ```bash
-curl -X POST http://localhost:8000/orders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "customer": "João Silva",
-    "items": ["Notebook Pro", "Mouse Gamer"],
-    "total": 4599.90
-  }'
+docker compose up    # sobe app + banco
+docker compose down  # derruba tudo
 ```
 
-**Resposta:**
-```json
-{
-  "id": "a1b2c3d4-...",
-  "customer": "João Silva",
-  "items": ["Notebook Pro", "Mouse Gamer"],
-  "total": 4599.90,
-  "status": "created",
-  "created_at": "2026-03-19T12:00:00Z"
-}
-```
+---
 
-**Atualizar status:**
-```bash
-curl -X PATCH http://localhost:8000/orders/{id}/status \
-  -H "Content-Type: application/json" \
-  -d '{"status": "processing"}'
-```
+## 6. Deploy com Kubernetes
 
-**Cancelar pedido:**
-```bash
-curl -X DELETE http://localhost:8000/orders/{id}
-```
+A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 
-## Estrutura do Projeto
+### Deployment — order-service
+
+- **2 réplicas** — garante alta disponibilidade; se um pod falhar, o outro continua servindo
+- **Liveness probe** — verifica `/health` a cada 15s. Se falhar, o Kubernetes **reinicia o pod automaticamente** (self-healing)
+- **Readiness probe** — verifica `/health` a cada 10s. Pods que não estão prontos são **removidos do balanceamento** até se recuperarem
+- **Resource limits** — cada pod tem limites definidos (CPU: 250m, memória: 256Mi), impedindo que um container monopolize recursos do nó
+- **Credenciais via Secret** — usuário, senha e nome do banco são injetados via `secretKeyRef`, sem hardcoding nos manifests
+
+### Deployment — PostgreSQL
+
+- **1 réplica** com `PersistentVolumeClaim` de 1Gi — dados sobrevivem a reinícios e recriações do pod
+- Acessível apenas internamente via **ClusterIP** na porta 5432
+
+### Service — NodePort
+
+A aplicação é exposta externamente através de um **Service NodePort** na porta `30080`:
 
 ```
-.
-├── app/
-│   ├── main.py            # Entrypoint FastAPI (lifespan, rotas, cleanup)
-│   ├── routes.py          # Endpoints CRUD /orders
-│   ├── models.py          # Schemas Pydantic (OrderCreate, Order, StatusUpdate)
-│   ├── database.py        # Engine async SQLAlchemy + sessão
-│   ├── db_models.py       # Modelo ORM (tabela orders)
-│   ├── metrics.py         # Configuração Prometheus
-│   ├── dashboard.py       # HTML do dashboard (/)
-│   ├── docs_page.py       # HTML do Swagger customizado (/docs)
-│   └── requirements.txt   # Dependências Python
-├── k8s/
-│   ├── namespace.yaml
-│   ├── postgres-secret.yaml
-│   ├── postgres-pvc.yaml
-│   ├── postgres-deployment.yaml
-│   ├── postgres-service.yaml
-│   ├── deployment.yaml
-│   └── service.yaml
-├── scripts/
-│   ├── setup-ec2.sh       # Provisionamento da EC2 (k3s + manifests)
-│   └── traffic.sh         # Gerador de tráfego para testes
-├── .github/workflows/
-│   └── deploy.yml         # Pipeline CI/CD
-├── Dockerfile             # Multi-stage build
-├── docker-compose.yml     # Stack local (app + PostgreSQL)
-└── .env.example           # Variáveis de ambiente
+Usuário ──► EC2_IP:30080 ──► Service (NodePort) ──► Pod :8000
 ```
 
-## Como Executar
+Qualquer requisição na porta 30080 do EC2 é roteada para um dos pods da aplicação na porta 8000.
+
+### Self-healing e resiliência
+
+O Kubernetes monitora continuamente o estado dos pods. Se um pod falhar ou não responder ao liveness probe:
+
+1. O pod é automaticamente reiniciado
+2. O tráfego é redirecionado para os pods saudáveis
+3. O deployment garante que sempre existam 2 réplicas rodando
+
+---
+
+## 7. Ambiente de Deploy
+
+### Infraestrutura
+
+O cluster Kubernetes roda em uma **instância AWS EC2** com a seguinte configuração:
+
+| Especificação | Valor |
+|---------------|-------|
+| **Sistema Operacional** | Ubuntu 22.04 LTS |
+| **Tipo de instância** | t3.small (mínimo recomendado) |
+| **Distribuição Kubernetes** | k3s (leve, single-node) |
+| **IP** | Elastic IP fixo |
+| **Portas abertas** | 22 (SSH), 30080 (aplicação), 6443 (API Kubernetes) |
+
+### Deploy real em produção
+
+Este **não é um projeto que roda apenas localmente**. A aplicação está configurada para deploy em um cluster Kubernetes real na AWS, acessível publicamente pela internet.
+
+O script `scripts/setup-ec2.sh` automatiza toda a preparação do servidor:
+1. Atualiza o sistema operacional
+2. Instala o k3s e configura o `kubectl`
+3. Cria o pull secret para autenticação no GHCR
+4. Substitui placeholders nos manifests
+5. Aplica todos os manifests Kubernetes
+6. Aguarda os deployments ficarem prontos
+
+Após a execução do setup, o pipeline CI/CD assume: qualquer push na `main` atualiza a aplicação automaticamente.
+
+---
+
+## 8. Como Executar Localmente
 
 ### Pré-requisitos
 
 - **Docker** e **Docker Compose** instalados
-- (Opcional) **Python 3.12+** para rodar sem Docker
-
----
 
 ### Opção 1 — Docker Compose (recomendado)
 
-A forma mais simples. Sobe a aplicação e o PostgreSQL com um único comando.
+Sobe a aplicação e o PostgreSQL com um único comando:
 
 ```bash
-# 1. Clonar o repositório
-git clone https://github.com/<seu-usuario>/Projeto-devops.git
+# Clonar o repositório
+git clone https://github.com/seu-usuario/Projeto-devops.git
 cd Projeto-devops
 
-# 2. (Opcional) Ajustar variáveis de ambiente
+# (Opcional) Configurar variáveis de ambiente
 cp .env.example .env
 
-# 3. Subir os serviços
+# Subir os serviços
 docker compose up
 ```
 
 Acesse:
 - **Dashboard:** http://localhost:8000
-- **Docs:** http://localhost:8000/docs
+- **API Docs:** http://localhost:8000/docs
 - **Métricas:** http://localhost:8000/metrics
-- **Health:** http://localhost:8000/health
+- **Health check:** http://localhost:8000/health
 
-Para parar: `Ctrl+C` ou `docker compose down`
+### Opção 2 — Docker (imagem avulsa)
 
----
-
-### Opção 2 — Docker (sem Compose)
-
-Útil quando você já tem um PostgreSQL rodando.
+Para quando você já possui um PostgreSQL rodando:
 
 ```bash
-# 1. Build da imagem
+# Build da imagem
 docker build -t order-service .
 
-# 2. Rodar o container
+# Rodar o container
 docker run -p 8000:8000 \
   -e DATABASE_HOST=host.docker.internal \
   -e DATABASE_USER=orders \
@@ -222,122 +305,116 @@ docker run -p 8000:8000 \
   order-service
 ```
 
-> `host.docker.internal` permite o container acessar um PostgreSQL rodando na máquina host.
-
----
-
-### Opção 3 — Localmente (desenvolvimento)
-
-```bash
-# 1. Instalar dependências
-pip install -r app/requirements.txt
-
-# 2. Subir um PostgreSQL (via Docker, por exemplo)
-docker run -d --name postgres \
-  -e POSTGRES_USER=orders \
-  -e POSTGRES_PASSWORD=orders \
-  -e POSTGRES_DB=orders \
-  -p 5432:5432 \
-  postgres:16-alpine
-
-# 3. Iniciar a aplicação com hot reload
-python -m uvicorn app.main:app --reload
-```
-
----
-
 ### Gerar tráfego de teste
 
-O script `traffic.sh` cria pedidos automaticamente e percorre o ciclo de vida completo (`created → processing → completed`).
-
 ```bash
-# Ciclo único (3 pedidos)
 bash scripts/traffic.sh http://localhost:8000
-
-# Loop contínuo (Ctrl+C para parar)
-bash scripts/traffic.sh --loop http://localhost:8000
-
-# Personalizado: 5 pedidos por ciclo, intervalo de 15s, 10 ciclos
-bash scripts/traffic.sh --loop --orders 5 --interval 15 --count 10 http://localhost:8000
 ```
 
-## Variáveis de Ambiente
+---
 
-| Variável | Padrão | Descrição |
-|----------|--------|-----------|
-| `DATABASE_HOST` | `localhost` | Host do PostgreSQL |
-| `DATABASE_PORT` | `5432` | Porta do PostgreSQL |
-| `DATABASE_USER` | `orders` | Usuário do banco |
-| `DATABASE_PASSWORD` | `orders` | Senha do banco |
-| `DATABASE_NAME` | `orders` | Nome do banco |
-| `DATA_RETENTION_HOURS` | `24` | Horas para manter pedidos antes da limpeza automática |
+## 9. Fluxo de Deploy
 
-## Deploy em Produção (AWS EC2 + Kubernetes)
+O que acontece automaticamente após um `git push origin main`:
 
-### 1. Criar a instância EC2
-
-- **AMI:** Ubuntu 22.04 LTS
-- **Tipo:** t3.small (mínimo)
-- **Security Group:** liberar portas `22` (SSH), `30080` (aplicação), `6443` (API do Kubernetes)
-- Associar um **Elastic IP** à instância
-
-### 2. Provisionar o servidor
-
-```bash
-# Copiar arquivos para a EC2
-scp -r k8s/ scripts/setup-ec2.sh ubuntu@<EC2_IP>:~/
-
-# Executar o setup (instala k3s, cria secrets, aplica manifests)
-ssh ubuntu@<EC2_IP> "bash setup-ec2.sh <SEU_USUARIO_GITHUB>"
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  1. TRIGGER         git push na branch main                     │
+│       │                                                         │
+│       ▼                                                         │
+│  2. BUILD           GitHub Actions constrói a imagem Docker     │
+│       │             usando o Dockerfile multi-stage             │
+│       ▼                                                         │
+│  3. PUSH            Imagem é publicada no GHCR com tag          │
+│       │             do commit SHA (versionamento imutável)      │
+│       ▼                                                         │
+│  4. TRANSFER        Manifests K8s são copiados via SCP          │
+│       │             para a instância EC2                        │
+│       ▼                                                         │
+│  5. DEPLOY          Via SSH, os manifests são aplicados         │
+│       │             e a imagem é atualizada com kubectl         │
+│       ▼                                                         │
+│  6. ROLLOUT         Kubernetes faz rolling update dos pods      │
+│       │             sem downtime (2 réplicas alternadas)        │
+│       ▼                                                         │
+│  7. VERIFICAÇÃO     kubectl rollout status aguarda              │
+│                     confirmação de deploy bem-sucedido          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-O script pedirá um **Personal Access Token** do GitHub com escopo `read:packages` para autenticar no GHCR.
+**Tempo médio:** o pipeline completo executa em aproximadamente 2-3 minutos, do push à aplicação rodando em produção.
 
-### 3. Configurar GitHub Secrets
+---
 
-No repositório, vá em **Settings → Secrets and variables → Actions** e adicione:
+## 10. Estrutura do Projeto
 
-| Secret | Valor |
-|--------|-------|
-| `EC2_HOST` | Elastic IP da instância |
-| `EC2_SSH_KEY` | Conteúdo do arquivo `.pem` |
-| `DB_PASSWORD` | Senha do PostgreSQL |
-
-### 4. Deploy automático
-
-A partir daqui, qualquer push na branch `main` aciona o pipeline:
-
-1. **Build** — GitHub Actions compila a imagem Docker
-2. **Push** — Publica no GHCR com tag do commit SHA + `latest`
-3. **Deploy** — Conecta via SSH na EC2, aplica os manifests e atualiza a imagem com `kubectl set image`
-4. **Rollout** — Aguarda a atualização completar (timeout: 120s)
-
-```bash
-git push origin main  # deploy automático
+```
+.
+├── app/                            # Código da aplicação
+│   ├── main.py                     # Entrypoint FastAPI (lifespan, rotas, background tasks)
+│   ├── routes.py                   # Endpoints CRUD para /orders
+│   ├── models.py                   # Schemas Pydantic (validação de entrada/saída)
+│   ├── database.py                 # Engine async SQLAlchemy + gerenciamento de sessão
+│   ├── db_models.py                # Modelo ORM mapeando a tabela orders
+│   ├── metrics.py                  # Configuração do Prometheus
+│   ├── dashboard.py                # HTML do dashboard interativo (/)
+│   ├── docs_page.py                # HTML do Swagger UI customizado (/docs)
+│   └── requirements.txt            # Dependências Python
+│
+├── k8s/                            # Manifests Kubernetes
+│   ├── namespace.yaml              # Namespace order-service
+│   ├── postgres-secret.yaml        # Credenciais do banco (com placeholder)
+│   ├── postgres-pvc.yaml           # Volume persistente de 1Gi
+│   ├── postgres-deployment.yaml    # Deployment do PostgreSQL 16
+│   ├── postgres-service.yaml       # Service ClusterIP para o banco
+│   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, limits)
+│   └── service.yaml                # Service NodePort na porta 30080
+│
+├── scripts/
+│   ├── setup-ec2.sh                # Script de provisionamento do EC2 (k3s + manifests)
+│   └── traffic.sh                  # Gerador de tráfego para testes
+│
+├── .github/workflows/
+│   └── deploy.yml                  # Pipeline CI/CD (GitHub Actions)
+│
+├── Dockerfile                      # Multi-stage build (builder + runtime)
+├── docker-compose.yml              # Stack local (app + PostgreSQL)
+├── .env.example                    # Template de variáveis de ambiente
+└── CLAUDE.md                       # Documentação técnica do projeto
 ```
 
-### Verificar o deploy
+---
 
-```bash
-# Na EC2
-kubectl get pods -n order-service
-kubectl rollout status deployment/order-service -n order-service
+## 11. Melhorias Futuras
 
-# Testar externamente
-curl http://<EC2_IP>:30080/health
-```
+| Melhoria | Descrição |
+|----------|-----------|
+| **Observabilidade completa** | Integrar Grafana para dashboards visuais sobre as métricas Prometheus já coletadas |
+| **Auto scaling (HPA)** | Configurar Horizontal Pod Autoscaler para escalar réplicas baseado em CPU/memória |
+| **Ingress Controller** | Substituir NodePort por Ingress com NGINX para roteamento HTTP e terminação TLS |
+| **Certificado SSL** | Adicionar cert-manager + Let's Encrypt para HTTPS automático |
+| **Testes automatizados no pipeline** | Incluir etapa de testes unitários e de integração antes do build |
+| **Ambientes separados** | Criar namespaces para staging e produção com promoção controlada |
+| **Infrastructure as Code** | Provisionar a EC2 com Terraform em vez de setup manual |
+| **GitOps com ArgoCD** | Substituir o deploy via SSH por reconciliação declarativa com ArgoCD |
+| **Alertas** | Configurar Alertmanager para notificações em caso de falha nos pods ou métricas anômalas |
 
-## Recursos do Kubernetes
+---
 
-| Recurso | Nome | Detalhes |
-|---------|------|----------|
-| Namespace | `order-service` | Isola todos os recursos |
-| Deployment | `order-service` | 2 réplicas, liveness/readiness probes, resource limits |
-| Deployment | `postgres` | 1 réplica, volume persistente |
-| Service | `order-service` | NodePort 30080 → 8000 |
-| Service | `postgres` | ClusterIP 5432 (acesso interno) |
-| PVC | `postgres-pvc` | 1Gi para dados do PostgreSQL |
-| Secret | `postgres-secret` | Credenciais do banco |
+## 12. Conclusão
+
+Este projeto demonstra a implementação prática de um **pipeline DevOps completo**, abrangendo:
+
+- **Integração Contínua** — cada push dispara build e publicação automatizados via GitHub Actions
+- **Entrega Contínua** — o deploy acontece automaticamente no cluster Kubernetes após o push
+- **Containerização** — aplicação empacotada em imagem Docker otimizada com multi-stage build
+- **Orquestração** — Kubernetes gerencia réplicas, self-healing, probes e rolling updates
+- **Deploy em Cloud** — cluster k3s real rodando em instância AWS EC2, acessível publicamente
+- **Observabilidade** — métricas Prometheus e health checks integrados desde o início
+
+O objetivo é mostrar domínio sobre o ciclo completo de entrega de software, desde o commit até a aplicação rodando em produção, com automação, reprodutibilidade e boas práticas de engenharia.
 
 ---
 
