@@ -29,6 +29,7 @@ Thumbs.db
 
 # Misc
 *.log
+fix.md
 
 # Claude Code
 CLAUDE.md
