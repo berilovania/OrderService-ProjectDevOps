@@ -140,4 +140,4 @@ jobs:
               order-service=${IMAGE}:${GITHUB_SHA} \
               -n order-service
             kubectl rollout status deployment/order-service \
-              -n order-service --timeout=120s
+              -n order-service --timeout=300s

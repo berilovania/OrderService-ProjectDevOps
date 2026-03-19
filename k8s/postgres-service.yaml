@@ -5,7 +5,7 @@ metadata:
   namespace: order-service
 spec:
   selector:
-    app: postgres
+    statefulset.kubernetes.io/pod-name: postgres-0
   ports:
     - port: 5432
       targetPort: 5432
