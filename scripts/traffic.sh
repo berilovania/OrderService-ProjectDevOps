@@ -22,9 +22,9 @@ ITEMS_LIST=(
 
 # --- Defaults ---
 LOOP=false
-INTERVAL=5
+INTERVAL=10
 COUNT=0        # 0 = infinito
-ORDERS_PER_CYCLE=2
+ORDERS_PER_CYCLE=4
 QUIET=false
 BASE_URL="http://localhost:8000"
 
@@ -111,19 +111,24 @@ run_cycle() {
 
   total_created=$((total_created + created))
 
-  # 2. Avançar ciclo de vida: created → processing → completed
+  # 2. Avançar ciclo de vida: created → processing → (pausa) → completed
   log -e "\n--- Atualizando status ---"
   for order_id in "${created_ids[@]}"; do
     curl -s -X PATCH "${BASE_URL}/orders/${order_id}/status" \
       -H "Content-Type: application/json" \
       -d '{"status": "processing"}' > /dev/null
+    log "  … ${order_id} → processing"
+  done
 
+  # Pausa para tornar o status "processando" visível no dashboard
+  sleep 4
+
+  for order_id in "${created_ids[@]}"; do
     curl -s -X PATCH "${BASE_URL}/orders/${order_id}/status" \
       -H "Content-Type: application/json" \
       -d '{"status": "completed"}' > /dev/null
-
     completed=$((completed + 1))
-    log "  ✓ ${order_id} → processing → completed"
+    log "  ✓ ${order_id} → completed"
   done
 
   # 3. Cancelar um pedido aleatório (1 em 3 ciclos)

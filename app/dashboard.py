@@ -277,6 +277,16 @@ def get_dashboard_html():
         .empty-icon { font-size: 2.4em; opacity: 0.45; }
         .empty p { font-size: 0.92em; }
 
+        /* ── Pagination ─────────────────────────── */
+        #pager {
+            display: none; align-items: center; justify-content: center;
+            gap: 12px; padding: 10px 0; margin-bottom: 18px;
+        }
+        #pager-info {
+            font-size: 0.85em; color: var(--text-muted);
+            min-width: 64px; text-align: center; font-weight: 500;
+        }
+
         /* ── Endpoints table ────────────────────── */
         .ep-table { width: 100%; border-collapse: collapse; }
         .ep-table tr {
@@ -472,6 +482,16 @@ def get_dashboard_html():
         </div>
     </div>
 
+    <div id="pager">
+        <button class="btn btn-ghost" id="pager-prev" onclick="goToPage(-1)">
+            ← <span data-i18n="pager.prev">Anterior</span>
+        </button>
+        <span id="pager-info">1 / 1</span>
+        <button class="btn btn-ghost" id="pager-next" onclick="goToPage(1)">
+            <span data-i18n="pager.next">Próxima</span> →
+        </button>
+    </div>
+
     <div class="card">
         <div class="card-head">
             <span class="card-title" data-i18n="ep.title">Endpoints da API</span>
@@ -561,6 +581,8 @@ const TR = {
         'toast.refresh': 'Atualizado.',
         'toast.err.create': 'Erro ao criar pedido.',
         'toast.err.delete': 'Erro ao cancelar pedido.',
+        'pager.prev': 'Anterior',
+        'pager.next': 'Próxima',
     },
     en: {
         'nav.home':        'Dashboard',
@@ -596,6 +618,8 @@ const TR = {
         'toast.refresh': 'Refreshed.',
         'toast.err.create': 'Failed to create order.',
         'toast.err.delete': 'Failed to cancel order.',
+        'pager.prev': 'Previous',
+        'pager.next': 'Next',
     },
 };
 
@@ -726,63 +750,61 @@ function emptyHTML() {
     </div>`;
 }
 
-// ── Smart render ──────────────────────────
+// ── Pagination ────────────────────────────
+const PAGE_SIZE = 10;
+let currentPage = 1;
 let ordersCache = null;
 let lastNewId   = null;
 
-function smartRender(orders) {
+function updatePagination(total) {
+    const pager = document.getElementById('pager');
+    if (!pager) return;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    pager.style.display = total > PAGE_SIZE ? 'flex' : 'none';
+    document.getElementById('pager-info').textContent = `${currentPage} / ${totalPages}`;
+    document.getElementById('pager-prev').disabled = currentPage <= 1;
+    document.getElementById('pager-next').disabled = currentPage >= totalPages;
+}
+
+function goToPage(delta) {
+    if (!ordersCache) return;
+    const totalPages = Math.max(1, Math.ceil(ordersCache.length / PAGE_SIZE));
+    const next = currentPage + delta;
+    if (next < 1 || next > totalPages) return;
+    currentPage = next;
+    renderPage(ordersCache);
+}
+
+function renderPage(orders) {
     const list = document.getElementById('orders-list');
     const reversed = [...orders].reverse();
+    const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageOrders = reversed.slice(start, start + PAGE_SIZE);
 
-    if (ordersCache === null) {
-        list.innerHTML = orders.length === 0 ? emptyHTML() : '';
-        if (orders.length > 0) reversed.forEach(o => list.appendChild(buildRow(o, false)));
-        ordersCache = orders;
-        updateStats(orders);
-        return;
+    list.innerHTML = '';
+    if (orders.length === 0) {
+        list.innerHTML = emptyHTML();
+    } else {
+        pageOrders.forEach(o => {
+            const isNew = o.id === lastNewId && currentPage === 1;
+            list.appendChild(buildRow(o, isNew));
+        });
     }
+    updateStats(orders);
+    updatePagination(orders.length);
+}
 
-    const oldMap = new Map(ordersCache.map(o => [o.id, o]));
-    const newMap = new Map(orders.map(o => [o.id, o]));
-    const hasChanges =
+// ── Smart render ──────────────────────────
+function smartRender(orders) {
+    const oldMap = ordersCache ? new Map(ordersCache.map(o => [o.id, o])) : null;
+    const hasChanges = !ordersCache ||
         orders.length !== ordersCache.length ||
         orders.some(o => { const old = oldMap.get(o.id); return !old || old.status !== o.status; });
     if (!hasChanges) return;
-
     ordersCache = orders;
-
-    oldMap.forEach((_, id) => {
-        if (!newMap.has(id)) {
-            const el = document.getElementById(`o-${id}`);
-            if (el) { el.classList.add('removing'); setTimeout(() => el.remove(), 300); }
-        }
-    });
-
-    if (orders.length === 0) {
-        setTimeout(() => { list.innerHTML = emptyHTML(); }, 300);
-        updateStats(orders); return;
-    }
-
-    const emptyEl = list.querySelector('.empty');
-    if (emptyEl) list.innerHTML = '';
-
-    reversed.forEach(order => {
-        const existing = document.getElementById(`o-${order.id}`);
-        if (existing) {
-            if (existing.dataset.status !== order.status) {
-                existing.dataset.status = order.status;
-                const icon  = existing.querySelector('.order-icon');
-                const badge = existing.querySelector('.badge');
-                if (icon)  icon.textContent = ICONS[order.status];
-                if (badge) { badge.className = `badge ${BADGE[order.status]}`; badge.textContent = LABELS[order.status]; }
-            }
-        } else {
-            const isNew = order.id === lastNewId;
-            const row = buildRow(order, isNew);
-            list.insertBefore(row, list.querySelector('.order-row') || null);
-        }
-    });
-    updateStats(orders);
+    renderPage(orders);
 }
 
 // ── Load ──────────────────────────────────
@@ -795,6 +817,7 @@ async function loadOrders() {
 }
 
 async function refresh() {
+    currentPage = 1;
     ordersCache = null;
     await loadOrders();
     toast(t('toast.refresh'));
