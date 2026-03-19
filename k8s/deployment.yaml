@@ -53,11 +53,13 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 10
+            initialDelaySeconds: 45
             periodSeconds: 15
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 5
+            initialDelaySeconds: 20
             periodSeconds: 10
+            failureThreshold: 6

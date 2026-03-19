@@ -135,9 +135,18 @@ jobs:
             kubectl apply -f service.yaml
             kubectl rollout status statefulset/postgres \
               -n order-service --timeout=180s
+            sleep 15
             kubectl apply -f deployment.yaml
             kubectl set image deployment/order-service \
               order-service=${IMAGE}:${GITHUB_SHA} \
               -n order-service
-            kubectl rollout status deployment/order-service \
-              -n order-service --timeout=300s
+            if ! kubectl rollout status deployment/order-service \
+              -n order-service --timeout=600s; then
+              echo "--- Pod status ---"
+              kubectl get pods -n order-service -o wide
+              echo "--- Order-service pod events ---"
+              kubectl describe pods -n order-service -l app=order-service | tail -40
+              echo "--- Order-service logs ---"
+              kubectl logs -n order-service -l app=order-service --tail=50 2>/dev/null || true
+              exit 1
+            fi
