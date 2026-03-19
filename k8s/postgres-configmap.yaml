@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: order-service
+data:
+  01-replication.sh: |
+    #!/bin/bash
+    # Runs only on the primary (postgres-0) during first initialization.
+    # Allows replica pods to connect for streaming replication.
+    echo "host replication all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+    psql -U "$POSTGRES_USER" -c "SELECT pg_reload_conf();"
+    echo "Replication rule added and pg_hba.conf reloaded."
