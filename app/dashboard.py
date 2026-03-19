@@ -1,12 +1,14 @@
 def get_dashboard_html():
     return """<!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Service</title>
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light');document.documentElement.classList.add('no-trans');</script>
     <style>
+        html.no-trans * { transition: none !important; }
         /* ── Tokens: Light ──────────────────────── */
         :root {
             --primary:        #6366f1;
@@ -370,6 +372,16 @@ def get_dashboard_html():
             margin-left: auto; color: var(--primary); font-weight: 700;
         }
 
+        /* ── Footer ─────────────────────────────── */
+        footer {
+            text-align: center;
+            padding: 24px 20px 32px;
+            color: var(--text-muted);
+            font-size: 0.8em;
+            border-top: 1px solid var(--border);
+            margin-top: 8px;
+        }
+
         @media (max-width: 760px) {
             .stats { grid-template-columns: 1fr 1fr; }
             .ep-table td:nth-child(3) { display: none; }
@@ -505,6 +517,8 @@ def get_dashboard_html():
     </div>
 
 </div>
+
+<footer>Desenvolvido por <strong>Matheus Santos Caldas</strong></footer>
 
 <div id="toasts"></div>
 
@@ -843,6 +857,7 @@ async function deleteOrder(id) {
 // ── Init ──────────────────────────────────
 applyTheme(currentTheme);
 applyLang(currentLang);
+requestAnimationFrame(() => document.documentElement.classList.remove('no-trans'));
 setInterval(loadOrders, 8000);
 </script>
 </body>

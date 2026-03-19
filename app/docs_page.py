@@ -1,13 +1,15 @@
 def get_docs_html() -> str:
     return """<!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docs — Order Service</title>
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light');document.documentElement.classList.add('no-trans');</script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
     <style>
+        html.no-trans * { transition: none !important; }
         /* ── Tokens: Light ──────────────────────── */
         :root {
             --primary:        #6366f1;
@@ -435,6 +437,17 @@ def get_docs_html() -> str:
             margin-left: auto; color: var(--primary); font-weight: 700;
         }
 
+        /* ── Footer ─────────────────────────────── */
+        footer {
+            text-align: center;
+            padding: 24px 20px 32px;
+            color: var(--text-muted);
+            font-size: 0.8em;
+            border-top: 1px solid var(--border);
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
         @media (max-width: 768px) {
             nav { padding: 0 16px; }
             #swagger-ui { padding: 16px 12px 40px; }
@@ -480,6 +493,8 @@ def get_docs_html() -> str:
 </nav>
 
 <div id="swagger-ui"></div>
+
+<footer>Desenvolvido por <strong>Matheus Santos Caldas</strong></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
 <script>
@@ -547,6 +562,7 @@ def get_docs_html() -> str:
     // ── Init ───────────────────────────────
     applyTheme(currentTheme);
     applyLang(currentLang);
+    requestAnimationFrame(() => document.documentElement.classList.remove('no-trans'));
 
     // ── Swagger UI ─────────────────────────
     SwaggerUIBundle({
