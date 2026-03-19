@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from .models import Order, OrderCreate, OrderStatus, StatusUpdate
 
-router = APIRouter()
+router = APIRouter(tags=["Orders"])
 
 # In-memory storage
 orders: dict[str, Order] = {}

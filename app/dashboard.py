@@ -5,6 +5,7 @@ def get_dashboard_html():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Service</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <style>
         /* ── Tokens: Light ──────────────────────── */
         :root {
@@ -109,6 +110,7 @@ def get_dashboard_html():
             transition: background var(--transition), color var(--transition);
         }
         .nav-link:hover { background: var(--primary-light); color: var(--primary); }
+        .nav-link.active { background: var(--primary-light); color: var(--primary); }
         .nav-divider { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
         .nav-status {
             display: flex; align-items: center; gap: 6px;
@@ -328,6 +330,46 @@ def get_dashboard_html():
         }
         @keyframes spinning { to{transform:rotate(360deg)} }
 
+        /* ── Language selector ──────────────────── */
+        .lang-selector {
+            position: relative;
+            margin-left: 4px;
+        }
+        .lang-toggle {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 10px; border-radius: var(--radius-sm);
+            border: 1px solid var(--border); background: var(--surface);
+            color: var(--text-secondary); cursor: pointer;
+            font-size: 0.85em; font-weight: 600;
+            transition: background var(--transition), border-color var(--transition);
+        }
+        .lang-toggle:hover {
+            background: var(--bg-subtle); border-color: var(--border-strong);
+        }
+        .lang-arrow {
+            font-size: 0.7em; opacity: 0.6;
+            transition: transform 0.2s;
+        }
+        .lang-selector.open .lang-arrow { transform: rotate(180deg); }
+        .lang-menu {
+            display: none;
+            position: absolute; top: calc(100% + 4px); right: 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow-lg);
+            min-width: 160px; overflow: hidden; z-index: 300;
+        }
+        .lang-selector.open .lang-menu { display: block; }
+        .lang-option {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            padding: 10px 14px; border: none; background: none;
+            color: var(--text); font-size: 0.88em; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .lang-option:hover { background: var(--bg-subtle); }
+        .lang-check {
+            margin-left: auto; color: var(--primary); font-weight: 700;
+        }
+
         @media (max-width: 760px) {
             .stats { grid-template-columns: 1fr 1fr; }
             .ep-table td:nth-child(3) { display: none; }
@@ -352,10 +394,27 @@ def get_dashboard_html():
             <span data-i18n="nav.operational">Operacional</span>
         </div>
         <div class="nav-divider"></div>
+        <a class="nav-link active" href="/" data-i18n="nav.home">Dashboard</a>
         <a class="nav-link" href="/docs" data-i18n="nav.docs">Docs</a>
         <a class="nav-link" href="/metrics">Metrics</a>
         <a class="nav-link" href="/health">Health</a>
-        <button class="icon-btn" id="lang-btn" title="Idioma / Language" onclick="toggleLang()">EN</button>
+        <div class="lang-selector" id="lang-selector">
+            <button class="lang-toggle" id="lang-toggle" onclick="toggleLangMenu()">
+                <span id="lang-flag">🇧🇷</span>
+                <span id="lang-label">PT</span>
+                <span class="lang-arrow">▾</span>
+            </button>
+            <div class="lang-menu" id="lang-menu">
+                <button class="lang-option" onclick="selectLang('pt')">
+                    <span>🇧🇷</span> Português
+                    <span class="lang-check" id="check-pt">✓</span>
+                </button>
+                <button class="lang-option" onclick="selectLang('en')">
+                    <span>🇺🇸</span> English
+                    <span class="lang-check" id="check-en"></span>
+                </button>
+            </div>
+        </div>
         <button class="icon-btn" id="theme-btn" title="Tema / Theme" onclick="toggleTheme()">🌙</button>
     </div>
 </nav>
@@ -455,6 +514,7 @@ const BASE = window.location.origin;
 // ── i18n ─────────────────────────────────
 const TR = {
     pt: {
+        'nav.home':        'Dashboard',
         'nav.operational': 'Operacional',
         'nav.docs':        'Docs',
         'stat.total':      'Total',
@@ -489,6 +549,7 @@ const TR = {
         'toast.err.delete': 'Erro ao cancelar pedido.',
     },
     en: {
+        'nav.home':        'Dashboard',
         'nav.operational': 'Operational',
         'nav.docs':        'Docs',
         'stat.total':      'Total',
@@ -546,13 +607,29 @@ function applyLang(lang) {
         const k = el.getAttribute('data-i18n');
         el.textContent = t(k);
     });
-    document.getElementById('lang-btn').textContent = lang === 'pt' ? 'EN' : 'PT';
+    // Update lang selector
+    const flag = document.getElementById('lang-flag');
+    const label = document.getElementById('lang-label');
+    if (flag) flag.textContent = lang === 'pt' ? '🇧🇷' : '🇺🇸';
+    if (label) label.textContent = lang === 'pt' ? 'PT' : 'EN';
+    document.getElementById('check-pt').textContent = lang === 'pt' ? '✓' : '';
+    document.getElementById('check-en').textContent = lang === 'en' ? '✓' : '';
     // force re-render to update dynamic status labels
     ordersCache = null;
     loadOrders();
 }
 
-function toggleLang() { applyLang(currentLang === 'pt' ? 'en' : 'pt'); }
+function toggleLangMenu() {
+    document.getElementById('lang-selector').classList.toggle('open');
+}
+function selectLang(lang) {
+    applyLang(lang);
+    document.getElementById('lang-selector').classList.remove('open');
+}
+document.addEventListener('click', (e) => {
+    const sel = document.getElementById('lang-selector');
+    if (sel && !sel.contains(e.target)) sel.classList.remove('open');
+});
 
 // ── Theme ─────────────────────────────────
 function applyTheme(theme) {

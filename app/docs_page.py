@@ -1,10 +1,11 @@
 def get_docs_html() -> str:
     return """<!DOCTYPE html>
-<html data-theme="light">
+<html lang="pt-BR" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docs — Order Service</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
     <style>
         /* ── Tokens: Light ──────────────────────── */
@@ -12,6 +13,7 @@ def get_docs_html() -> str:
             --primary:        #6366f1;
             --primary-dark:   #4f46e5;
             --primary-light:  #e0e7ff;
+            --primary-muted:  #c7d2fe;
             --success:        #10b981;
             --success-bg:     #d1fae5;
             --warning:        #f59e0b;
@@ -43,6 +45,7 @@ def get_docs_html() -> str:
             --primary:        #818cf8;
             --primary-dark:   #6366f1;
             --primary-light:  #1e1b4b;
+            --primary-muted:  #312e81;
             --success:        #34d399;
             --success-bg:     #064e3b;
             --warning:        #fbbf24;
@@ -137,6 +140,17 @@ def get_docs_html() -> str:
             max-width: 1080px;
             margin: 0 auto;
             padding: 24px 20px 48px;
+        }
+
+        /* Smooth theme transitions for Swagger elements */
+        .swagger-ui .wrapper,
+        .swagger-ui .opblock,
+        .swagger-ui .opblock-summary,
+        .swagger-ui section.models,
+        .swagger-ui .scheme-container,
+        .swagger-ui .opblock-body,
+        .swagger-ui .opblock-section-header {
+            transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
         }
 
         /* ── Swagger UI: hide default topbar ────── */
@@ -327,8 +341,99 @@ def get_docs_html() -> str:
         [data-theme="dark"] .swagger-ui .btn.execute { color: #fff !important; background: var(--primary) !important; border-color: var(--primary) !important; }
         [data-theme="dark"] .swagger-ui .btn.authorize { color: var(--primary) !important; border-color: var(--primary) !important; background: transparent !important; }
 
+        /* Operation path text */
+        [data-theme="dark"] .swagger-ui .opblock-summary-path { color: var(--text) !important; }
+
+        /* Rendered markdown inside expanded blocks */
+        [data-theme="dark"] .swagger-ui .renderedMarkdown p,
+        [data-theme="dark"] .swagger-ui .renderedMarkdown code { color: var(--text-secondary) !important; }
+
+        /* Description wrappers */
+        [data-theme="dark"] .swagger-ui .opblock-description-wrapper p,
+        [data-theme="dark"] .swagger-ui .opblock-external-docs-wrapper p { color: var(--text) !important; }
+
+        /* Response description inner */
+        [data-theme="dark"] .swagger-ui .response-col_description__inner p,
+        [data-theme="dark"] .swagger-ui .response-col_description__inner span { color: var(--text) !important; }
+
+        /* Table body cells */
+        [data-theme="dark"] .swagger-ui table tbody tr td { color: var(--text) !important; border-color: var(--border) !important; }
+
+        /* Tabs (Example Value / Schema) */
+        [data-theme="dark"] .swagger-ui .tab li { color: var(--text-secondary) !important; }
+        [data-theme="dark"] .swagger-ui .tab li.active { color: var(--text) !important; }
+
+        /* Generic labels */
+        [data-theme="dark"] .swagger-ui label { color: var(--text) !important; }
+
+        /* Media type message */
+        [data-theme="dark"] .swagger-ui .response-control-media-type__accept-message { color: var(--text-muted) !important; }
+
+        /* Model properties */
+        [data-theme="dark"] .swagger-ui .model .property,
+        [data-theme="dark"] .swagger-ui .model .property.primitive { color: var(--text-secondary) !important; }
+
+        /* Highlight code / JSON response body */
+        [data-theme="dark"] .swagger-ui .highlight-code { color: #e2e8f0 !important; }
+        [data-theme="dark"] .swagger-ui pre.microlight code { color: #e2e8f0 !important; }
+        [data-theme="dark"] .swagger-ui .opblock-body pre { color: #e2e8f0 !important; }
+
+        /* Copy to clipboard */
+        [data-theme="dark"] .swagger-ui .copy-to-clipboard { background: var(--surface) !important; }
+        [data-theme="dark"] .swagger-ui .copy-to-clipboard button { color: var(--text-muted) !important; }
+
+        /* Required parameter labels */
+        [data-theme="dark"] .swagger-ui .parameter__name.required::after { color: var(--danger) !important; }
+        [data-theme="dark"] .swagger-ui .parameter__name.required span { color: var(--danger) !important; }
+
+        /* Method badge text */
+        [data-theme="dark"] .swagger-ui .opblock .opblock-summary-method { color: #fff !important; }
+
+        /* Responses table status */
+        [data-theme="dark"] .swagger-ui .responses-table .response-col_status { color: var(--text) !important; }
+
         /* Loading */
         [data-theme="dark"] .swagger-ui .loading-container .loading::after { color: var(--text-muted) !important; }
+
+        /* ── Language selector ──────────────────── */
+        .lang-selector {
+            position: relative;
+            margin-left: 4px;
+        }
+        .lang-toggle {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 10px; border-radius: var(--radius-sm);
+            border: 1px solid var(--border); background: var(--surface);
+            color: var(--text-secondary); cursor: pointer;
+            font-size: 0.85em; font-weight: 600;
+            transition: background var(--transition), border-color var(--transition);
+        }
+        .lang-toggle:hover {
+            background: var(--bg-subtle); border-color: var(--border-strong);
+        }
+        .lang-arrow {
+            font-size: 0.7em; opacity: 0.6;
+            transition: transform 0.2s;
+        }
+        .lang-selector.open .lang-arrow { transform: rotate(180deg); }
+        .lang-menu {
+            display: none;
+            position: absolute; top: calc(100% + 4px); right: 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow-lg);
+            min-width: 160px; overflow: hidden; z-index: 300;
+        }
+        .lang-selector.open .lang-menu { display: block; }
+        .lang-option {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            padding: 10px 14px; border: none; background: none;
+            color: var(--text); font-size: 0.88em; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .lang-option:hover { background: var(--bg-subtle); }
+        .lang-check {
+            margin-left: auto; color: var(--primary); font-weight: 700;
+        }
 
         @media (max-width: 768px) {
             nav { padding: 0 16px; }
@@ -353,7 +458,23 @@ def get_docs_html() -> str:
         <a class="nav-link active" href="/docs" id="nav-docs">Docs</a>
         <a class="nav-link" href="/metrics">Metrics</a>
         <a class="nav-link" href="/health">Health</a>
-        <button class="icon-btn" id="lang-btn" title="Idioma / Language" onclick="toggleLang()">EN</button>
+        <div class="lang-selector" id="lang-selector">
+            <button class="lang-toggle" id="lang-toggle" onclick="toggleLangMenu()">
+                <span id="lang-flag">🇧🇷</span>
+                <span id="lang-label">PT</span>
+                <span class="lang-arrow">▾</span>
+            </button>
+            <div class="lang-menu" id="lang-menu">
+                <button class="lang-option" onclick="selectLang('pt')">
+                    <span>🇧🇷</span> Português
+                    <span class="lang-check" id="check-pt">✓</span>
+                </button>
+                <button class="lang-option" onclick="selectLang('en')">
+                    <span>🇺🇸</span> English
+                    <span class="lang-check" id="check-en"></span>
+                </button>
+            </div>
+        </div>
         <button class="icon-btn" id="theme-btn" title="Tema / Theme" onclick="toggleTheme()">🌙</button>
     </div>
 </nav>
@@ -384,13 +505,29 @@ def get_docs_html() -> str:
     function applyLang(lang) {
         currentLang = lang;
         localStorage.setItem('lang', lang);
-        document.getElementById('lang-btn').textContent  = lang === 'pt' ? 'EN' : 'PT';
         document.getElementById('nav-status-text').textContent = t('nav.operational');
         document.getElementById('nav-home').textContent = t('nav.home');
         document.getElementById('nav-docs').textContent = t('nav.docs');
+        // Update lang selector
+        const flag = document.getElementById('lang-flag');
+        const label = document.getElementById('lang-label');
+        if (flag) flag.textContent = lang === 'pt' ? '🇧🇷' : '🇺🇸';
+        if (label) label.textContent = lang === 'pt' ? 'PT' : 'EN';
+        document.getElementById('check-pt').textContent = lang === 'pt' ? '✓' : '';
+        document.getElementById('check-en').textContent = lang === 'en' ? '✓' : '';
     }
 
-    function toggleLang() { applyLang(currentLang === 'pt' ? 'en' : 'pt'); }
+    function toggleLangMenu() {
+        document.getElementById('lang-selector').classList.toggle('open');
+    }
+    function selectLang(lang) {
+        applyLang(lang);
+        document.getElementById('lang-selector').classList.remove('open');
+    }
+    document.addEventListener('click', (e) => {
+        const sel = document.getElementById('lang-selector');
+        if (sel && !sel.contains(e.target)) sel.classList.remove('open');
+    });
 
     // ── Theme ──────────────────────────────
     function applyTheme(theme) {
