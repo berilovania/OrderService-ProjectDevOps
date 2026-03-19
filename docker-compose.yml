@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: orders
-      POSTGRES_PASSWORD: orders
-      POSTGRES_DB: orders
+      POSTGRES_USER: ${DATABASE_USER:-orders}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-orders}
+      POSTGRES_DB: ${DATABASE_NAME:-orders}
     ports:
       - "5432:5432"
     volumes:
@@ -18,11 +18,11 @@ services:
       - postgres
     environment:
       DATABASE_HOST: postgres
-      DATABASE_PORT: "5432"
-      DATABASE_USER: orders
-      DATABASE_PASSWORD: orders
-      DATABASE_NAME: orders
-      DATA_RETENTION_HOURS: "24"
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_USER: ${DATABASE_USER:-orders}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-orders}
+      DATABASE_NAME: ${DATABASE_NAME:-orders}
+      DATA_RETENTION_HOURS: ${DATA_RETENTION_HOURS:-24}
 
 volumes:
   postgres_data:
