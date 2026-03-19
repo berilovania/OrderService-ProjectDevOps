@@ -5,6 +5,7 @@ on:
     branches: [main]
 
 env:
+  IMAGE_NAME: orderservice-projectdevops
   IMAGE: ghcr.io/${{ github.repository_owner }}/orderservice-projectdevops
 
 jobs:
@@ -35,15 +36,38 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:latest
 
-      - name: Deploy to EC2 via SSH
+      - name: Copy manifests to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "k8s/"
+          target: "~/order-service"
+
+      - name: Replace placeholders and deploy to EC2
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE,IMAGE_NAME
           script: |
+            cd ~/order-service/k8s
+            sed -i 's|__GITHUB_USER__|${{ github.repository_owner }}|g' deployment.yaml
+            sed -i 's|__IMAGE_NAME__|${{ env.IMAGE_NAME }}|g' deployment.yaml
+            sed -i 's|__DB_PASSWORD__|${{ secrets.DB_PASSWORD }}|g' postgres-secret.yaml
+            kubectl apply -f namespace.yaml
+            kubectl apply -f postgres-secret.yaml
+            kubectl apply -f postgres-pvc.yaml
+            kubectl apply -f postgres-deployment.yaml
+            kubectl apply -f postgres-service.yaml
+            kubectl apply -f service.yaml
+            kubectl rollout status deployment/postgres \
+              -n order-service --timeout=120s
+            kubectl apply -f deployment.yaml
             kubectl set image deployment/order-service \
-              order-service=${{ env.IMAGE }}:${{ github.sha }} \
+              order-service=${IMAGE}:${{ github.sha }} \
               -n order-service
             kubectl rollout status deployment/order-service \
               -n order-service --timeout=120s

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from uuid import uuid4
 
@@ -28,4 +28,4 @@ class Order(BaseModel):
     items: list[str]
     total: float
     status: OrderStatus = OrderStatus.created
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

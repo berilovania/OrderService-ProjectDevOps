@@ -17,9 +17,31 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: ghcr.io/berilovania/orderservice-projectdevops:latest
+          image: ghcr.io/__GITHUB_USER__/__IMAGE_NAME__:latest
           ports:
             - containerPort: 8000
+          env:
+            - name: DATABASE_HOST
+              value: "postgres"
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: DATABASE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: DATA_RETENTION_HOURS
+              value: "24"
           resources:
             requests:
               cpu: 100m
