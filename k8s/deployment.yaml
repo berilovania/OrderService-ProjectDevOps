@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: ghcr.io/OWNER/projeto-devops:latest
+          image: ghcr.io/berilovania/projeto-devops:latest
           ports:
             - containerPort: 8000
           resources:
