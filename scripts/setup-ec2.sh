@@ -54,6 +54,12 @@ kubectl create secret generic postgres-secret \
   --namespace order-service \
   --dry-run=client -o yaml | kubectl apply -f -
 
+echo "==> Waiting for default service account to be created..."
+until kubectl get serviceaccount default -n order-service &>/dev/null; do
+  echo "  default SA not ready yet, retrying in 2s..."
+  sleep 2
+done
+
 echo "==> Patching default service account..."
 kubectl patch serviceaccount default \
   -n order-service \
