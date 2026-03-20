@@ -538,7 +538,7 @@ def get_dashboard_html():
 
 </div>
 
-<footer>2026 — desenvolvido por <strong>Matheus Santos</strong></footer>
+<footer>2026 — Desenvolvido por <strong>Matheus Santos</strong></footer>
 
 <div id="toasts"></div>
 
