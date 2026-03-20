@@ -21,15 +21,15 @@ async def init_db():
     import asyncio
     from .db_models import Base
 
-    for attempt in range(10):
+    for attempt in range(30):
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             return
         except Exception as exc:
-            if attempt < 9:
-                print(f"DB connection attempt {attempt + 1} failed: {exc} — retrying in 3s...")
-                await asyncio.sleep(3)
+            if attempt < 29:
+                print(f"DB connection attempt {attempt + 1} failed: {exc} — retrying in 5s...")
+                await asyncio.sleep(5)
             else:
                 raise
 
