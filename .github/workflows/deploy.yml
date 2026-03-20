@@ -90,16 +90,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copy manifests to EC2
+      - name: Copy manifests to GCP
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.GCP_HOST }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.GCP_SSH_KEY }}
           source: "k8s/"
           target: "~/order-service"
 
-      - name: Deploy to EC2
+      - name: Deploy to GCP
         uses: appleboy/ssh-action@v1
         env:
           IMAGE: ${{ env.IMAGE }}
@@ -108,16 +108,11 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           REPO_OWNER: ${{ github.repository_owner }}
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ secrets.GCP_HOST }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.GCP_SSH_KEY }}
           envs: IMAGE,IMAGE_NAME,DB_PASSWORD,GITHUB_SHA,REPO_OWNER
           script: |
-            # Restart k3s to free memory before deploy, then restore kubeconfig permissions
-            sudo systemctl restart k3s
-            sleep 45
-            sudo chmod 644 /etc/rancher/k3s/k3s.yaml
-
             # Create/update secret directly — password never touches disk or shell history
             kubectl create secret generic postgres-secret \
               --from-literal=POSTGRES_PASSWORD="$DB_PASSWORD" \
