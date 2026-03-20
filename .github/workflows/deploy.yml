@@ -113,6 +113,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: IMAGE,IMAGE_NAME,DB_PASSWORD,GITHUB_SHA,REPO_OWNER
           script: |
+            # Fix kubeconfig permissions for ubuntu user
+            sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+
             # Create/update secret directly — password never touches disk or shell history
             kubectl create secret generic postgres-secret \
               --from-literal=POSTGRES_PASSWORD="$DB_PASSWORD" \
