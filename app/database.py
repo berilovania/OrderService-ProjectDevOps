@@ -18,10 +18,20 @@ async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def init_db():
+    import asyncio
     from .db_models import Base
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    for attempt in range(10):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            return
+        except Exception as exc:
+            if attempt < 9:
+                print(f"DB connection attempt {attempt + 1} failed: {exc} — retrying in 3s...")
+                await asyncio.sleep(3)
+            else:
+                raise
 
 
 async def get_db():
