@@ -63,6 +63,10 @@ echo "==> Replacing placeholders in deployment manifest..."
 sed -i "s|__GITHUB_USER__|${GITHUB_USER}|g" k8s/deployment.yaml
 sed -i "s|__IMAGE_NAME__|${IMAGE_NAME}|g" k8s/deployment.yaml
 
+echo "==> Pre-pulling images to avoid memory spike during pod startup..."
+sudo k3s crictl pull postgres:16-alpine
+echo "  postgres:16-alpine cached."
+
 echo "==> Applying Kubernetes manifests..."
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/postgres-configmap.yaml

@@ -100,11 +100,11 @@ spec:
               mountPath: /docker-entrypoint-initdb.d
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 250m
-              memory: 256Mi
+              cpu: 200m
+              memory: 128Mi
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "$(POSTGRES_USER)"]
