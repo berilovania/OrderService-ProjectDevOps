@@ -214,7 +214,7 @@ A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 - **2 réplicas** — garante alta disponibilidade; se um pod falhar, o outro continua servindo
 - **Liveness probe** — verifica `/health` a cada 15s. Se falhar, o Kubernetes **reinicia o pod automaticamente** (self-healing)
 - **Readiness probe** — verifica `/health` a cada 10s. Pods que não estão prontos são **removidos do balanceamento** até se recuperarem
-- **Resource limits** — cada pod tem limites definidos (CPU: 250m, memória: 256Mi), impedindo que um container monopolize recursos do nó
+- **Resource limits** — cada pod tem limites definidos (CPU: 200m, memória: 128Mi), impedindo que um container monopolize recursos do nó
 - **Credenciais via Secret** — usuário, senha e nome do banco são injetados via `secretKeyRef`, sem hardcoding nos manifests
 
 ### Deployment — PostgreSQL
