@@ -133,12 +133,11 @@ jobs:
 
             # Apply manifests (postgres-secret.yaml excluded — managed above)
             kubectl apply --validate=false -f namespace.yaml
-            kubectl apply --validate=false -f postgres-configmap.yaml
-            kubectl apply --validate=false -f postgres-headless-service.yaml
+            kubectl apply --validate=false -f postgres-pvc.yaml
+            kubectl apply --validate=false -f postgres-deployment.yaml
             kubectl apply --validate=false -f postgres-service.yaml
-            kubectl apply --validate=false -f postgres-statefulset.yaml
             kubectl apply --validate=false -f service.yaml
-            kubectl rollout status statefulset/postgres \
+            kubectl rollout status deployment/postgres \
               -n order-service --timeout=180s
             sleep 15
             kubectl apply --validate=false -f deployment.yaml

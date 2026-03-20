@@ -69,10 +69,9 @@ echo "  postgres:16-alpine cached."
 
 echo "==> Applying Kubernetes manifests..."
 kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/postgres-configmap.yaml
-kubectl apply -f k8s/postgres-headless-service.yaml
+kubectl apply -f k8s/postgres-pvc.yaml
+kubectl apply -f k8s/postgres-deployment.yaml
 kubectl apply -f k8s/postgres-service.yaml
-kubectl apply -f k8s/postgres-statefulset.yaml
 kubectl apply -f k8s/service.yaml
 
 echo "==> Waiting for PostgreSQL pod to be Running..."

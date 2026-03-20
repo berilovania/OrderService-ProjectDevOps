@@ -57,10 +57,10 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │   │                │                     │   │                   │
 │   │   │                ▼                     │   │                   │
 │   │   │   ┌────────────────────────────┐     │   │                   │
-│   │   │   │  PostgreSQL 16 StatefulSet │     │   │                   │
-│   │   │   │  2 pods (primary+replica)  │     │   │                   │
-│   │   │   │  PVC 1Gi por pod           │     │   │                   │
-│   │   │   │  porta 5432 (ClusterIP)    │     │   │                   │
+│   │   │   │   PostgreSQL 16 (1 pod)    │     │   │                   │
+│   │   │   │   PVC 1Gi persistente      │     │   │                   │
+│   │   │   │   porta 5432 (ClusterIP)   │     │   │                   │
+│   │   │   │                            │     │   │                   │
 │   │   │   └────────────────────────────┘     │   │                   │
 │   │   │                                      │   │                   │
 │   │   └──────────────────────────────────────┘   │                   │
@@ -147,8 +147,8 @@ Aplica a nova versão no cluster Kubernetes:
 - Conecta na EC2 via SSH e executa:
   - Criação/atualização do Secret do PostgreSQL (direto no cluster, sem gravar em disco)
   - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`)
-  - `kubectl apply` em todos os manifests (namespace, secrets, volumes, StatefulSet, deployments, services)
-  - Aguarda o StatefulSet do PostgreSQL ficar pronto (timeout: 180s)
+  - `kubectl apply` em todos os manifests (namespace, secrets, volumes, deployments, services)
+  - Aguarda o Deployment do PostgreSQL ficar pronto (timeout: 180s)
   - `kubectl set image` para atualizar a imagem do deployment com o SHA do commit
   - `kubectl rollout status` para aguardar o rolling update (timeout: 600s)
   - Em caso de falha: imprime diagnóstico automático (status dos pods, eventos, logs)
@@ -217,14 +217,11 @@ A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 - **Resource limits** — cada pod tem limites definidos (CPU: 250m, memória: 256Mi), impedindo que um container monopolize recursos do nó
 - **Credenciais via Secret** — usuário, senha e nome do banco são injetados via `secretKeyRef`, sem hardcoding nos manifests
 
-### StatefulSet — PostgreSQL (Alta Disponibilidade)
+### Deployment — PostgreSQL
 
-- **2 réplicas** gerenciadas por um `StatefulSet`: pod `postgres-0` (primário) e `postgres-1` (réplica)
-- **Streaming replication** configurado via `postgres-configmap.yaml`: o pod primário aceita escritas e transmite o WAL para a réplica em tempo real
-- `pg_basebackup` inicializa a réplica automaticamente a partir do primário na primeira execução
-- **`PersistentVolumeClaim` de 1Gi por pod** — dados sobrevivem a reinícios e recriações
-- **Service ClusterIP** roteia o tráfego da aplicação apenas para o pod primário (`postgres-0`)
-- **Headless Service** fornece resolução DNS individual por pod (`postgres-0.postgres-headless`) para a comunicação de replicação
+- **1 réplica** com `PersistentVolumeClaim` de 1Gi — dados sobrevivem a reinícios e recriações do pod
+- Acessível apenas internamente via **ClusterIP** na porta 5432
+- Limites de recursos ajustados para instâncias t2/t3.micro: CPU 200m, memória 128Mi
 
 ### Service — NodePort
 
@@ -420,12 +417,10 @@ O que acontece automaticamente após um `git push origin main`:
 ├── k8s/                            # Manifests Kubernetes
 │   ├── namespace.yaml              # Namespace order-service
 │   ├── postgres-secret.yaml        # Credenciais do banco (placeholder __DB_PASSWORD__)
-│   ├── postgres-configmap.yaml     # Scripts de inicialização da replicação
 │   ├── postgres-pvc.yaml           # Volume persistente de 1Gi
-│   ├── postgres-statefulset.yaml   # StatefulSet PostgreSQL 16 (primary + replica)
-│   ├── postgres-headless-service.yaml # Service headless para DNS de replicação
-│   ├── postgres-service.yaml       # Service ClusterIP (roteia ao pod primário)
-│   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, limits)
+│   ├── postgres-deployment.yaml    # Deployment do PostgreSQL 16 (1 réplica)
+│   ├── postgres-service.yaml       # Service ClusterIP na porta 5432
+│   ├── deployment.yaml             # Deployment da aplicação (1 réplica, probes, limits)
 │   └── service.yaml                # Service NodePort na porta 30080
 │
 ├── scripts/
@@ -534,7 +529,7 @@ Este projeto demonstra a implementação prática de um **pipeline DevOps comple
 - **Entrega Contínua** — o deploy acontece automaticamente no cluster Kubernetes após testes e scan aprovados
 - **Containerização** — aplicação empacotada em imagem Docker otimizada com multi-stage build
 - **Orquestração** — Kubernetes gerencia réplicas, self-healing, probes e rolling updates
-- **Alta Disponibilidade do Banco** — PostgreSQL em StatefulSet com streaming replication (primary + replica)
+- **Persistência de dados** — PostgreSQL com PersistentVolumeClaim, dados sobrevivem a reinícios
 - **Deploy em Cloud** — cluster k3s real rodando em instância AWS EC2, acessível publicamente
 - **Observabilidade** — métricas Prometheus e health checks integrados desde o início
 - **Segurança** — scan de vulnerabilidades Trivy em cada build, secrets sem hardcoding
