@@ -13,6 +13,7 @@ WORKDIR /project
 
 COPY --from=builder /install /usr/local
 COPY app/ app/
+COPY favicon.ico .
 
 EXPOSE 8000
 
