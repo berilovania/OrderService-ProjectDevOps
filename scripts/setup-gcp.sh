@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ============================================================
-# setup-gcp.sh — Setup k3s + deploy order-service on Ubuntu GCP (e2-small)
-# Usage: ssh into GCP VM, then run: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD]
+# setup-gcp.sh — Setup k3s + deploy order-service on GCP (e2-small)
+# Usage: ssh into GCP VM as user 'gcp', then run: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD]
 # ============================================================
 
 GITHUB_USER="${1:?Usage: bash setup-gcp.sh <GITHUB_USER>}"
@@ -26,7 +26,7 @@ check_step "Instalação do k3s"
 if command -v k3s &>/dev/null; then
   echo "==> k3s já instalado, pulando instalação..."
 else
-  echo "==> Instalando k3s (kubeconfig legível pelo usuário ubuntu)..."
+  echo "==> Instalando k3s (kubeconfig legível pelo usuário gcp)..."
   curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
 fi
 
