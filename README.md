@@ -460,7 +460,73 @@ O que acontece automaticamente após um `git push origin main`:
 
 ---
 
-## 13. Conclusão
+## 13. Troubleshooting
+
+### k3s API não responde (`TLS handshake timeout` / `connection refused`)
+
+Sintoma: `kubectl get pods` retorna erro de TLS ou conexão recusada, mesmo com k3s ativo.
+
+**Causa:** instâncias t2/t3.micro (1GB RAM) ficam sem memória e o API server do k3s para de responder.
+
+**Diagnóstico:**
+```bash
+sudo systemctl status k3s
+free -h
+```
+
+Sinais de alerta: `swap > 400MB usado`, `load average > 2.0`, `%wa (I/O wait) > 50%` no `top`.
+
+**Solução — reiniciar limpo:**
+```bash
+sudo k3s-killall.sh
+sleep 15
+sudo systemctl restart k3s
+sleep 30
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+kubectl get nodes
+```
+
+---
+
+### Limpeza completa da instância EC2
+
+Use quando quiser reinstalar tudo do zero:
+
+```bash
+# 1. Parar todos os containers e desinstalar o k3s
+sudo k3s-killall.sh
+sudo /usr/local/bin/k3s-uninstall.sh
+
+# 2. Remover dados residuais
+sudo rm -rf /var/lib/rancher
+sudo rm -rf /etc/rancher
+sudo rm -rf ~/.kube
+rm -rf ~/order-service
+
+# 3. Verificar que ficou limpo (não deve retornar nenhum processo)
+ps aux | grep k3s | grep -v grep
+free -h
+```
+
+Após a limpeza, a memória deve estar com ~300MB usados e swap próximo de zero. Então refaça o setup:
+
+```bash
+git clone https://github.com/<GITHUB_USER>/OrderService-ProjectDevOps.git ~/order-service
+cd ~/order-service
+bash scripts/setup-ec2.sh <GITHUB_USER>
+```
+
+---
+
+### Pipeline falha com `error validating data: ... TLS handshake timeout`
+
+O `kubectl apply` durante o CI/CD tenta baixar o schema OpenAPI do cluster para validar os manifests, o que sobrecarrega o API server.
+
+**Solução já aplicada no pipeline:** todos os `kubectl apply` usam `--validate=false` e o k3s é reiniciado no início do job de deploy para liberar memória antes da aplicação dos manifests.
+
+---
+
+## 14. Conclusão
 
 Este projeto demonstra a implementação prática de um **pipeline DevOps completo**, abrangendo:
 
