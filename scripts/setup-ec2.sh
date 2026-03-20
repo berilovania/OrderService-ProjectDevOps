@@ -24,7 +24,13 @@ sudo chown "$(id -u):$(id -g)" ~/.kube/config
 export KUBECONFIG=~/.kube/config
 echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
 
-echo "==> Waiting for k3s to be ready..."
+echo "==> Waiting for k3s API to become available..."
+until kubectl get nodes &>/dev/null; do
+  echo "  k3s API not ready yet, retrying in 5s..."
+  sleep 5
+done
+
+echo "==> Waiting for node to be Ready..."
 kubectl wait --for=condition=Ready node --all --timeout=120s
 
 echo "==> Creating GHCR pull secret..."
