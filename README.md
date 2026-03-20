@@ -57,9 +57,10 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │   │                │                     │   │                   │
 │   │   │                ▼                     │   │                   │
 │   │   │   ┌────────────────────────────┐     │   │                   │
-│   │   │   │   PostgreSQL 16 (1 pod)    │     │   │                   │
-│   │   │   │   PVC 1Gi persistente      │     │   │                   │
-│   │   │   │   porta 5432 (ClusterIP)   │     │   │                   │
+│   │   │   │  PostgreSQL 16 StatefulSet │     │   │                   │
+│   │   │   │  2 pods (primary+replica)  │     │   │                   │
+│   │   │   │  PVC 1Gi por pod           │     │   │                   │
+│   │   │   │  porta 5432 (ClusterIP)    │     │   │                   │
 │   │   │   └────────────────────────────┘     │   │                   │
 │   │   │                                      │   │                   │
 │   │   └──────────────────────────────────────┘   │                   │
@@ -114,32 +115,43 @@ on:
     branches: [main]
 ```
 
-### Etapas do Pipeline
+### Jobs do Pipeline
 
 ```
-Checkout ──► Login GHCR ──► Build + Push ──► Copia manifests ──► Deploy na EC2
+[test] ──► [build-and-scan] ──► [deploy]
 ```
 
-**1. Checkout do código**
-O GitHub Actions clona o repositório na máquina virtual do runner usando `actions/checkout@v4`.
+O pipeline é dividido em três jobs com dependência sequencial — o deploy só ocorre se os testes passarem e a imagem for aprovada no scan de segurança.
 
-**2. Autenticação no GHCR**
-Realiza login no GitHub Container Registry utilizando o `GITHUB_TOKEN` gerado automaticamente, sem necessidade de credenciais adicionais.
+**Job 1 — test**
 
-**3. Build e Push da imagem Docker**
-Constrói a imagem usando `docker/build-push-action@v6` e publica no GHCR com duas tags:
-- `ghcr.io/<owner>/orderservice-projectdevops:<commit-sha>` — versionamento imutável
-- `ghcr.io/<owner>/orderservice-projectdevops:latest` — referência para a versão mais recente
+Executa os testes automatizados contra um banco PostgreSQL real (service container no runner):
+- Setup do Python 3.12 e instalação das dependências de produção + desenvolvimento
+- Executa `pytest` com banco PostgreSQL 16 em container (`localhost:5432`)
+- Falha imediata se qualquer teste quebrar — nenhuma imagem é construída
 
-**4. Copia manifests para a EC2**
-Transfere o diretório `k8s/` via SCP para a instância EC2, garantindo que os manifests estejam atualizados.
+**Job 2 — build-and-scan**
 
-**5. Deploy no Kubernetes**
-Conecta na EC2 via SSH e executa:
-- Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`, `__DB_PASSWORD__`)
-- `kubectl apply` em todos os manifests (namespace, secrets, volumes, deployments, services)
-- `kubectl set image` para atualizar a imagem do deployment com o SHA do commit
-- `kubectl rollout status` para aguardar a conclusão do deploy (timeout: 120s)
+Constrói e verifica a segurança da imagem antes de publicá-la:
+- Constrói a imagem Docker com `docker/build-push-action@v6`
+- **Trivy vulnerability scan** — analisa a imagem e falha em vulnerabilidades CRITICAL/HIGH com correção disponível
+- Autentica no GHCR via `GITHUB_TOKEN` (sem credenciais adicionais)
+- Publica a imagem com duas tags:
+  - `ghcr.io/<owner>/orderservice-projectdevops:<commit-sha>` — versionamento imutável
+  - `ghcr.io/<owner>/orderservice-projectdevops:latest` — referência para a versão mais recente
+
+**Job 3 — deploy**
+
+Aplica a nova versão no cluster Kubernetes:
+- Copia os manifests `k8s/` via SCP para a instância EC2
+- Conecta na EC2 via SSH e executa:
+  - Criação/atualização do Secret do PostgreSQL (direto no cluster, sem gravar em disco)
+  - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`)
+  - `kubectl apply` em todos os manifests (namespace, secrets, volumes, StatefulSet, deployments, services)
+  - Aguarda o StatefulSet do PostgreSQL ficar pronto (timeout: 180s)
+  - `kubectl set image` para atualizar a imagem do deployment com o SHA do commit
+  - `kubectl rollout status` para aguardar o rolling update (timeout: 600s)
+  - Em caso de falha: imprime diagnóstico automático (status dos pods, eventos, logs)
 
 ### Secrets necessários
 
@@ -205,10 +217,14 @@ A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 - **Resource limits** — cada pod tem limites definidos (CPU: 250m, memória: 256Mi), impedindo que um container monopolize recursos do nó
 - **Credenciais via Secret** — usuário, senha e nome do banco são injetados via `secretKeyRef`, sem hardcoding nos manifests
 
-### Deployment — PostgreSQL
+### StatefulSet — PostgreSQL (Alta Disponibilidade)
 
-- **1 réplica** com `PersistentVolumeClaim` de 1Gi — dados sobrevivem a reinícios e recriações do pod
-- Acessível apenas internamente via **ClusterIP** na porta 5432
+- **2 réplicas** gerenciadas por um `StatefulSet`: pod `postgres-0` (primário) e `postgres-1` (réplica)
+- **Streaming replication** configurado via `postgres-configmap.yaml`: o pod primário aceita escritas e transmite o WAL para a réplica em tempo real
+- `pg_basebackup` inicializa a réplica automaticamente a partir do primário na primeira execução
+- **`PersistentVolumeClaim` de 1Gi por pod** — dados sobrevivem a reinícios e recriações
+- **Service ClusterIP** roteia o tráfego da aplicação apenas para o pod primário (`postgres-0`)
+- **Headless Service** fornece resolução DNS individual por pod (`postgres-0.postgres-headless`) para a comunicação de replicação
 
 ### Service — NodePort
 
@@ -260,7 +276,38 @@ Após a execução do setup, o pipeline CI/CD assume: qualquer push na `main` at
 
 ---
 
-## 8. Como Executar Localmente
+## 8. Testes Automatizados
+
+O projeto inclui testes de integração que rodam contra um banco PostgreSQL real — sem mocks — para garantir que a lógica da aplicação e as queries funcionam corretamente.
+
+### Ferramentas
+
+| Ferramenta | Versão | Função |
+|------------|--------|--------|
+| `pytest` | 8.2.0 | Runner de testes |
+| `pytest-asyncio` | 0.23 | Suporte a testes assíncronos |
+| `httpx` | 0.27.0 | Cliente HTTP assíncrono para testar endpoints |
+
+### Executar localmente
+
+```bash
+# Instalar dependências de desenvolvimento
+pip install -r app/requirements.txt -r app/requirements-dev.txt
+
+# Subir o banco de dados
+docker compose up postgres -d
+
+# Executar os testes
+pytest tests/ -v
+```
+
+### No pipeline CI/CD
+
+Os testes são executados automaticamente no job `test` com um container PostgreSQL 16 provisionado pelo próprio GitHub Actions. O job de build **só inicia** após os testes passarem.
+
+---
+
+## 9. Como Executar e Testar Localmente
 
 ### Pré-requisitos
 
@@ -313,7 +360,7 @@ bash scripts/traffic.sh http://localhost:8000
 
 ---
 
-## 9. Fluxo de Deploy
+## 10. Fluxo de Deploy
 
 O que acontece automaticamente após um `git push origin main`:
 
@@ -323,32 +370,36 @@ O que acontece automaticamente após um `git push origin main`:
 │  1. TRIGGER         git push na branch main                     │
 │       │                                                         │
 │       ▼                                                         │
-│  2. BUILD           GitHub Actions constrói a imagem Docker     │
+│  2. TESTES          pytest contra PostgreSQL real               │
+│       │             falha = pipeline interrompido               │
+│       ▼                                                         │
+│  3. BUILD           GitHub Actions constrói a imagem Docker     │
 │       │             usando o Dockerfile multi-stage             │
 │       ▼                                                         │
-│  3. PUSH            Imagem é publicada no GHCR com tag          │
-│       │             do commit SHA (versionamento imutável)      │
+│  4. SCAN            Trivy analisa vulnerabilidades              │
+│       │             falha em CVEs CRITICAL/HIGH corrigíveis     │
 │       ▼                                                         │
-│  4. TRANSFER        Manifests K8s são copiados via SCP          │
-│       │             para a instância EC2                        │
+│  5. PUSH            Imagem publicada no GHCR (tag: SHA)         │
+│       │             versionamento imutável por commit           │
 │       ▼                                                         │
-│  5. DEPLOY          Via SSH, os manifests são aplicados         │
-│       │             e a imagem é atualizada com kubectl         │
+│  6. TRANSFER        Manifests K8s copiados via SCP para EC2     │
+│       │                                                         │
 │       ▼                                                         │
-│  6. ROLLOUT         Kubernetes faz rolling update dos pods      │
-│       │             sem downtime (2 réplicas alternadas)        │
+│  7. DEPLOY          Via SSH: kubectl apply em todos os          │
+│       │             manifests, kubectl set image                │
 │       ▼                                                         │
-│  7. VERIFICAÇÃO     kubectl rollout status aguarda              │
-│                     confirmação de deploy bem-sucedido          │
+│  8. ROLLOUT         Rolling update sem downtime (2 réplicas)    │
+│       │             kubectl rollout status (timeout: 600s)      │
+│       ▼                                                         │
+│  9. DIAGNÓSTICO     Em caso de falha: logs e eventos            │
+│                     impressos automaticamente                   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Tempo médio:** o pipeline completo executa em aproximadamente 2-3 minutos, do push à aplicação rodando em produção.
-
 ---
 
-## 10. Estrutura do Projeto
+## 11. Estrutura do Projeto
 
 ```
 .
@@ -361,33 +412,40 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── metrics.py                  # Configuração do Prometheus
 │   ├── dashboard.py                # HTML do dashboard interativo (/)
 │   ├── docs_page.py                # HTML do Swagger UI customizado (/docs)
-│   └── requirements.txt            # Dependências Python
+│   ├── requirements.txt            # Dependências de produção
+│   └── requirements-dev.txt        # Dependências de desenvolvimento (pytest, httpx)
+│
+├── tests/                          # Testes de integração
 │
 ├── k8s/                            # Manifests Kubernetes
 │   ├── namespace.yaml              # Namespace order-service
-│   ├── postgres-secret.yaml        # Credenciais do banco (com placeholder)
+│   ├── postgres-secret.yaml        # Credenciais do banco (placeholder __DB_PASSWORD__)
+│   ├── postgres-configmap.yaml     # Scripts de inicialização da replicação
 │   ├── postgres-pvc.yaml           # Volume persistente de 1Gi
-│   ├── postgres-deployment.yaml    # Deployment do PostgreSQL 16
-│   ├── postgres-service.yaml       # Service ClusterIP para o banco
+│   ├── postgres-statefulset.yaml   # StatefulSet PostgreSQL 16 (primary + replica)
+│   ├── postgres-headless-service.yaml # Service headless para DNS de replicação
+│   ├── postgres-service.yaml       # Service ClusterIP (roteia ao pod primário)
 │   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, limits)
 │   └── service.yaml                # Service NodePort na porta 30080
 │
 ├── scripts/
-│   ├── setup-ec2.sh                # Script de provisionamento do EC2 (k3s + manifests)
-│   └── traffic.sh                  # Gerador de tráfego para testes
+│   ├── setup-ec2.sh                # Provisionamento do EC2 (k3s + manifests)
+│   └── traffic.sh                  # Gerador de tráfego realista para testes
 │
 ├── .github/workflows/
-│   └── deploy.yml                  # Pipeline CI/CD (GitHub Actions)
+│   └── deploy.yml                  # Pipeline CI/CD (test → build+scan → deploy)
 │
 ├── Dockerfile                      # Multi-stage build (builder + runtime)
 ├── docker-compose.yml              # Stack local (app + PostgreSQL)
+├── pytest.ini                      # Configuração do pytest
 ├── .env.example                    # Template de variáveis de ambiente
+├── favicon.ico                     # Ícone customizado do serviço
 └── CLAUDE.md                       # Documentação técnica do projeto
 ```
 
 ---
 
-## 11. Melhorias Futuras
+## 12. Melhorias Futuras
 
 | Melhoria | Descrição |
 |----------|-----------|
@@ -395,7 +453,6 @@ O que acontece automaticamente após um `git push origin main`:
 | **Auto scaling (HPA)** | Configurar Horizontal Pod Autoscaler para escalar réplicas baseado em CPU/memória |
 | **Ingress Controller** | Substituir NodePort por Ingress com NGINX para roteamento HTTP e terminação TLS |
 | **Certificado SSL** | Adicionar cert-manager + Let's Encrypt para HTTPS automático |
-| **Testes automatizados no pipeline** | Incluir etapa de testes unitários e de integração antes do build |
 | **Ambientes separados** | Criar namespaces para staging e produção com promoção controlada |
 | **Infrastructure as Code** | Provisionar a EC2 com Terraform em vez de setup manual |
 | **GitOps com ArgoCD** | Substituir o deploy via SSH por reconciliação declarativa com ArgoCD |
@@ -403,16 +460,18 @@ O que acontece automaticamente após um `git push origin main`:
 
 ---
 
-## 12. Conclusão
+## 13. Conclusão
 
 Este projeto demonstra a implementação prática de um **pipeline DevOps completo**, abrangendo:
 
-- **Integração Contínua** — cada push dispara build e publicação automatizados via GitHub Actions
-- **Entrega Contínua** — o deploy acontece automaticamente no cluster Kubernetes após o push
+- **Integração Contínua** — cada push dispara testes automáticos, scan de segurança, build e publicação via GitHub Actions
+- **Entrega Contínua** — o deploy acontece automaticamente no cluster Kubernetes após testes e scan aprovados
 - **Containerização** — aplicação empacotada em imagem Docker otimizada com multi-stage build
 - **Orquestração** — Kubernetes gerencia réplicas, self-healing, probes e rolling updates
+- **Alta Disponibilidade do Banco** — PostgreSQL em StatefulSet com streaming replication (primary + replica)
 - **Deploy em Cloud** — cluster k3s real rodando em instância AWS EC2, acessível publicamente
 - **Observabilidade** — métricas Prometheus e health checks integrados desde o início
+- **Segurança** — scan de vulnerabilidades Trivy em cada build, secrets sem hardcoding
 
 O objetivo é mostrar domínio sobre o ciclo completo de entrega de software, desde o commit até a aplicação rodando em produção, com automação, reprodutibilidade e boas práticas de engenharia.
 
