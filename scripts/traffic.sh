@@ -1,29 +1,29 @@
 #!/bin/bash
-# traffic.sh — Gera tráfego realista contra o Order Service
+# traffic.sh — Generate realistic traffic against the Order Service
 # Usage: bash scripts/traffic.sh [OPTIONS] [BASE_URL]
 #
 # Options:
-#   --loop, -l         Roda em loop contínuo (Ctrl+C para parar)
-#   --interval, -i N   Segundos entre ciclos no loop (padrão: 5)
-#   --count, -n N      Número de ciclos no loop (padrão: infinito)
-#   --orders, -o N     Pedidos criados por ciclo (padrão: 2, máx: 6)
-#   --quiet, -q        Saída reduzida (só mostra resumo por ciclo)
+#   --loop, -l         Run in continuous loop (Ctrl+C to stop)
+#   --interval, -i N   Seconds between cycles in loop mode (default: 5)
+#   --count, -n N      Number of cycles in loop mode (default: infinite)
+#   --orders, -o N     Orders created per cycle (default: 2, max: 6)
+#   --quiet, -q        Reduced output (only shows cycle summary)
 
-# --- Dados realistas (espelhando app/dashboard.py) ---
-CUSTOMERS=("João Silva" "Maria Santos" "Pedro Costa" "Ana Oliveira" "Carlos Souza" "Beatriz Lima")
+# --- Realistic data (mirroring app/dashboard.py) ---
+CUSTOMERS=("John Silva" "Maria Santos" "Peter Costa" "Ana Oliveira" "Carlos Souza" "Beatriz Lima")
 ITEMS_LIST=(
-  "Notebook Pro,Mouse Gamer"
-  "Teclado Mecânico,Monitor 27in"
-  "Webcam Full HD,Headset BT"
-  "SSD NVMe 1TB,Hub USB-C"
-  "Mousepad XL,Suporte Notebook"
-  "Cadeira Gamer,Mesa Articulada"
+  "Notebook Pro,Gaming Mouse"
+  "Mechanical Keyboard,27in Monitor"
+  "Full HD Webcam,BT Headset"
+  "SSD NVMe 1TB,USB-C Hub"
+  "XL Mousepad,Laptop Stand"
+  "Gaming Chair,Articulated Desk"
 )
 
 # --- Defaults ---
 LOOP=false
 INTERVAL=10
-COUNT=0        # 0 = infinito
+COUNT=0        # 0 = infinite
 ORDERS_PER_CYCLE=4
 QUIET=false
 BASE_URL="http://localhost:8000"
@@ -37,27 +37,27 @@ while [[ $# -gt 0 ]]; do
     --count|-n)   COUNT="$2"; shift 2 ;;
     --orders|-o)  ORDERS_PER_CYCLE="$2"; shift 2 ;;
     http://*|https://*) BASE_URL="$1"; shift ;;
-    *)            echo "Opção desconhecida: $1"; exit 1 ;;
+    *)            echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
-# Limita orders ao máximo de 6 (tamanho dos arrays)
+# Limit orders to array size (max 6)
 [[ $ORDERS_PER_CYCLE -gt 6 ]] && ORDERS_PER_CYCLE=6
 
-# --- Estado global ---
+# --- Global state ---
 cycle=0
 total_created=0
 
-# --- Sinal de interrupção ---
-trap 'echo -e "\n==> Interrompido após $cycle ciclos. Total de pedidos criados: $total_created"; exit 0' INT
+# --- Interrupt handler ---
+trap 'echo -e "\n==> Interrupted after $cycle cycles. Total orders created: $total_created"; exit 0' INT
 
-# --- Funções auxiliares ---
+# --- Helper functions ---
 
 random_total() {
   awk "BEGIN{printf \"%.2f\", 80 + ($RANDOM % 1500) + $RANDOM/32768}"
 }
 
-# Converte array CSV de itens para JSON array
+# Convert CSV items array to JSON array
 items_to_json() {
   local csv="$1"
   local json="["
@@ -80,8 +80,8 @@ run_cycle() {
   local completed=0
   local cancelled=0
 
-  # 1. Criar pedidos
-  log -e "\n--- Criando $ORDERS_PER_CYCLE pedidos ---"
+  # 1. Create orders
+  log -e "\n--- Creating $ORDERS_PER_CYCLE orders ---"
   for ((i=0; i<ORDERS_PER_CYCLE; i++)); do
     local idx=$(( RANDOM % 6 ))
     local customer="${CUSTOMERS[$idx]}"
@@ -103,16 +103,16 @@ run_cycle() {
     if [[ -n "$order_id" ]]; then
       created_ids+=("$order_id")
       created=$((created + 1))
-      log "  + Pedido criado: ${order_id} | ${customer} | R\$ ${total}"
+      log "  + Order created: ${order_id} | ${customer} | \$ ${total}"
     else
-      log "  ! Falha ao criar pedido"
+      log "  ! Failed to create order"
     fi
   done
 
   total_created=$((total_created + created))
 
-  # 2. Avançar ciclo de vida: created → processing → (pausa) → completed
-  log -e "\n--- Atualizando status ---"
+  # 2. Advance lifecycle: created → processing → (pause) → completed
+  log -e "\n--- Updating status ---"
   for order_id in "${created_ids[@]}"; do
     curl -s -X PATCH "${BASE_URL}/orders/${order_id}/status" \
       -H "Content-Type: application/json" \
@@ -120,7 +120,7 @@ run_cycle() {
     log "  … ${order_id} → processing"
   done
 
-  # Pausa para tornar o status "processando" visível no dashboard
+  # Pause to make "processing" status visible on dashboard
   sleep 4
 
   for order_id in "${created_ids[@]}"; do
@@ -131,27 +131,27 @@ run_cycle() {
     log "  ✓ ${order_id} → completed"
   done
 
-  # 3. Cancelar um pedido aleatório (1 em 3 ciclos)
+  # 3. Cancel a random order (1 in 3 cycles)
   if [[ $(( cycle % 3 )) -eq 0 ]] && [[ ${#created_ids[@]} -gt 0 ]]; then
     local cancel_idx=$(( RANDOM % ${#created_ids[@]} ))
     local cancel_id="${created_ids[$cancel_idx]}"
     local cancel_resp
     cancel_resp=$(curl -s -X DELETE "${BASE_URL}/orders/${cancel_id}")
     cancelled=$((cancelled + 1))
-    log "  ✗ ${cancel_id} cancelado"
+    log "  ✗ ${cancel_id} cancelled"
   fi
 
-  # 4. Resumo do ciclo
+  # 4. Cycle summary
   local ts
   ts=$(date "+%Y-%m-%d %H:%M:%S")
   if $QUIET; then
-    echo "[${ts}] Ciclo #${cycle} — ${created} criados, ${completed} concluídos, ${cancelled} cancelados"
+    echo "[${ts}] Cycle #${cycle} — ${created} created, ${completed} completed, ${cancelled} cancelled"
   else
-    echo -e "\n==> Ciclo #${cycle} concluído — ${created} criados, ${completed} concluídos, ${cancelled} cancelados"
+    echo -e "\n==> Cycle #${cycle} done — ${created} created, ${completed} completed, ${cancelled} cancelled"
   fi
 }
 
-# --- Execução ---
+# --- Execution ---
 
 if ! $QUIET; then
   echo "==> Targeting: ${BASE_URL}"
@@ -165,23 +165,23 @@ if $LOOP; then
     run_cycle
 
     if [[ $COUNT -gt 0 ]] && [[ $cycle -ge $COUNT ]]; then
-      echo -e "\n==> $COUNT ciclos concluídos. Total de pedidos criados: $total_created"
+      echo -e "\n==> $COUNT cycles completed. Total orders created: $total_created"
       break
     fi
 
     sleep "$INTERVAL"
   done
 else
-  # Modo único: 1 ciclo com saída completa
+  # Single mode: 1 cycle with full output
   cycle=1
   ORDERS_PER_CYCLE=3
   run_cycle
 
-  log -e "\n--- Estado Final ---"
+  log -e "\n--- Final State ---"
   $QUIET || curl -s "${BASE_URL}/orders" | python -m json.tool
 
-  log -e "\n--- Métricas (primeiras 20 linhas) ---"
+  log -e "\n--- Metrics (first 20 lines) ---"
   $QUIET || curl -s "${BASE_URL}/metrics" | head -20
 
-  echo -e "\n==> Concluído! Total de pedidos criados: $total_created"
+  echo -e "\n==> Done! Total orders created: $total_created"
 fi

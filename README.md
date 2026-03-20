@@ -1,6 +1,6 @@
 # Order Service — Pipeline DevOps Completo
 
-Pipeline CI/CD de ponta a ponta com containerização Docker, orquestração Kubernetes e deploy automatizado em nuvem AWS. Do `git push` à produção em minutos, sem intervenção manual.
+Pipeline CI/CD de ponta a ponta com containerização Docker, orquestração Kubernetes e deploy automatizado em nuvem GCP. Do `git push` à produção em minutos, sem intervenção manual.
 
 ---
 
@@ -12,7 +12,7 @@ A aplicação — uma API REST de gerenciamento de pedidos construída com FastA
 
 - **Automação completa** — zero intervenção manual entre o commit e a produção
 - **Infraestrutura como código** — manifests Kubernetes versionados no repositório
-- **Deploy real em nuvem** — cluster Kubernetes rodando em instância AWS EC2
+- **Deploy real em nuvem** — cluster Kubernetes rodando em VM GCP Compute Engine
 - **Boas práticas de containerização** — imagem Docker otimizada com multi-stage build
 - **Observabilidade** — métricas Prometheus, health checks e probes de liveness/readiness
 
@@ -38,13 +38,13 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │  1. Checkout do código              │                            │
 │   │  2. Build da imagem Docker          │                            │
 │   │  3. Push para GHCR (tag: SHA)       │                            │
-│   │  4. Copia manifests para EC2 (SCP)  │                            │
+│   │  4. Copia manifests para GCP (SCP)  │                            │
 │   │  5. Deploy via SSH + kubectl        │                            │
 │   └──────────────────┬──────────────────┘                            │
 │                      │                                               │
 │                      ▼                                               │
 │   ┌──────────────────────────────────────────────┐                   │
-│   │            AWS EC2 (Ubuntu 22.04)            │                   │
+│   │       GCP Compute Engine (Ubuntu 22.04)       │                   │
 │   │                                              │                   │
 │   │   ┌──────────────────────────────────────┐   │                   │
 │   │   │          Cluster k3s                 │   │                   │
@@ -68,7 +68,7 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │   NodePort :30080 ──► :8000                  │                   │
 │   └──────────────────────────────────────────────┘                   │
 │                                                                      │
-│   Usuário ──► http://<EC2_IP>:30080                                  │
+│   Usuário ──► http://<GCP_IP>:30080                                  │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -80,9 +80,9 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 | **GitHub Actions** | Orquestra o pipeline CI/CD (build, push, deploy) |
 | **Docker** | Empacota a aplicação em imagem reproduzível |
 | **GHCR** | Armazena as imagens Docker versionadas por commit SHA |
-| **k3s** | Distribuição leve do Kubernetes que roda no EC2 |
+| **k3s** | Distribuição leve do Kubernetes que roda na VM GCP |
 | **PostgreSQL** | Persistência de dados com volume Kubernetes |
-| **AWS EC2** | Infraestrutura cloud onde o cluster é executado |
+| **GCP Compute Engine** | Infraestrutura cloud onde o cluster é executado |
 
 ---
 
@@ -98,7 +98,7 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 | **CI/CD** | GitHub Actions | Automação do pipeline de entrega |
 | **Registry** | GitHub Container Registry (GHCR) | Armazenamento de imagens Docker |
 | **Monitoramento** | Prometheus (prometheus-fastapi-instrumentator) | Coleta de métricas da aplicação |
-| **Cloud** | AWS EC2 (Ubuntu 22.04) | Hospedagem do cluster Kubernetes |
+| **Cloud** | GCP Compute Engine (Ubuntu 22.04) | Hospedagem do cluster Kubernetes |
 | **Versionamento** | Git + GitHub | Controle de código e colaboração |
 
 ---
@@ -143,8 +143,8 @@ Constrói e verifica a segurança da imagem antes de publicá-la:
 **Job 3 — deploy**
 
 Aplica a nova versão no cluster Kubernetes:
-- Copia os manifests `k8s/` via SCP para a instância EC2
-- Conecta na EC2 via SSH e executa:
+- Copia os manifests `k8s/` via SCP para a VM GCP
+- Conecta na VM GCP via SSH e executa:
   - Criação/atualização do Secret do PostgreSQL (direto no cluster, sem gravar em disco)
   - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`)
   - `kubectl apply` em todos os manifests (namespace, secrets, volumes, deployments, services)
@@ -157,8 +157,8 @@ Aplica a nova versão no cluster Kubernetes:
 
 | Secret | Descrição |
 |--------|-----------|
-| `EC2_HOST` | Elastic IP da instância EC2 |
-| `EC2_SSH_KEY` | Chave privada SSH (conteúdo do `.pem`) |
+| `GCP_HOST` | External IP da VM GCP |
+| `GCP_SSH_KEY` | Chave privada SSH |
 | `DB_PASSWORD` | Senha do PostgreSQL para o cluster |
 
 > O `GITHUB_TOKEN` é provido automaticamente pelo GitHub Actions com permissões de `contents: read` e `packages: write`.
@@ -214,24 +214,24 @@ A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 - **2 réplicas** — garante alta disponibilidade; se um pod falhar, o outro continua servindo
 - **Liveness probe** — verifica `/health` a cada 15s. Se falhar, o Kubernetes **reinicia o pod automaticamente** (self-healing)
 - **Readiness probe** — verifica `/health` a cada 10s. Pods que não estão prontos são **removidos do balanceamento** até se recuperarem
-- **Resource limits** — cada pod tem limites definidos (CPU: 200m, memória: 128Mi), impedindo que um container monopolize recursos do nó
+- **Resource limits** — cada pod tem limites definidos (CPU: 300m, memória: 192Mi), impedindo que um container monopolize recursos do nó
 - **Credenciais via Secret** — usuário, senha e nome do banco são injetados via `secretKeyRef`, sem hardcoding nos manifests
 
 ### Deployment — PostgreSQL
 
 - **1 réplica** com `PersistentVolumeClaim` de 1Gi — dados sobrevivem a reinícios e recriações do pod
 - Acessível apenas internamente via **ClusterIP** na porta 5432
-- Limites de recursos ajustados para instâncias t2/t3.micro: CPU 200m, memória 128Mi
+- Limites de recursos ajustados para e2-small (2GB RAM): CPU 300m, memória 256Mi
 
 ### Service — NodePort
 
 A aplicação é exposta externamente através de um **Service NodePort** na porta `30080`:
 
 ```
-Usuário ──► EC2_IP:30080 ──► Service (NodePort) ──► Pod :8000
+User ──► GCP_IP:30080 ──► Service (NodePort) ──► Pod :8000
 ```
 
-Qualquer requisição na porta 30080 do EC2 é roteada para um dos pods da aplicação na porta 8000.
+Qualquer requisição na porta 30080 da VM é roteada para um dos pods da aplicação na porta 8000.
 
 ### Self-healing e resiliência
 
@@ -247,21 +247,21 @@ O Kubernetes monitora continuamente o estado dos pods. Se um pod falhar ou não 
 
 ### Infraestrutura
 
-O cluster Kubernetes roda em uma **instância AWS EC2** com a seguinte configuração:
+O cluster Kubernetes roda em uma **VM GCP Compute Engine** com a seguinte configuração:
 
 | Especificação | Valor |
 |---------------|-------|
 | **Sistema Operacional** | Ubuntu 22.04 LTS |
-| **Tipo de instância** | t3.small (mínimo recomendado) |
+| **Tipo de instância** | e2-small (2 vCPU shared, 2GB RAM) |
 | **Distribuição Kubernetes** | k3s (leve, single-node) |
-| **IP** | Elastic IP fixo |
+| **IP** | External IP (estático) |
 | **Portas abertas** | 22 (SSH), 30080 (aplicação), 6443 (API Kubernetes) |
 
 ### Deploy real em produção
 
-Este **não é um projeto que roda apenas localmente**. A aplicação está configurada para deploy em um cluster Kubernetes real na AWS, acessível publicamente pela internet.
+Este **não é um projeto que roda apenas localmente**. A aplicação está configurada para deploy em um cluster Kubernetes real na GCP, acessível publicamente pela internet.
 
-O script `scripts/setup-ec2.sh` automatiza toda a preparação do servidor:
+O script `scripts/setup-gcp.sh` automatiza toda a preparação do servidor:
 1. Atualiza o sistema operacional
 2. Instala o k3s e configura o `kubectl`
 3. Cria o pull secret para autenticação no GHCR
@@ -379,7 +379,7 @@ O que acontece automaticamente após um `git push origin main`:
 │  5. PUSH            Imagem publicada no GHCR (tag: SHA)         │
 │       │             versionamento imutável por commit           │
 │       ▼                                                         │
-│  6. TRANSFER        Manifests K8s copiados via SCP para EC2     │
+│  6. TRANSFER        Manifests K8s copiados via SCP para GCP     │
 │       │                                                         │
 │       ▼                                                         │
 │  7. DEPLOY          Via SSH: kubectl apply em todos os          │
@@ -420,11 +420,11 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── postgres-pvc.yaml           # Volume persistente de 1Gi
 │   ├── postgres-deployment.yaml    # Deployment do PostgreSQL 16 (1 réplica)
 │   ├── postgres-service.yaml       # Service ClusterIP na porta 5432
-│   ├── deployment.yaml             # Deployment da aplicação (1 réplica, probes, limits)
+│   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, limits)
 │   └── service.yaml                # Service NodePort na porta 30080
 │
 ├── scripts/
-│   ├── setup-ec2.sh                # Provisionamento do EC2 (k3s + manifests)
+│   ├── setup-gcp.sh                # Provisionamento da VM GCP (k3s + manifests)
 │   └── traffic.sh                  # Gerador de tráfego realista para testes
 │
 ├── .github/workflows/
@@ -449,7 +449,7 @@ O que acontece automaticamente após um `git push origin main`:
 | **Ingress Controller** | Substituir NodePort por Ingress com NGINX para roteamento HTTP e terminação TLS |
 | **Certificado SSL** | Adicionar cert-manager + Let's Encrypt para HTTPS automático |
 | **Ambientes separados** | Criar namespaces para staging e produção com promoção controlada |
-| **Infrastructure as Code** | Provisionar a EC2 com Terraform em vez de setup manual |
+| **Infrastructure as Code** | Provisionar a VM GCP com Terraform em vez de setup manual |
 | **GitOps com ArgoCD** | Substituir o deploy via SSH por reconciliação declarativa com ArgoCD |
 | **Alertas** | Configurar Alertmanager para notificações em caso de falha nos pods ou métricas anômalas |
 
@@ -461,7 +461,7 @@ O que acontece automaticamente após um `git push origin main`:
 
 Sintoma: `kubectl get pods` retorna erro de TLS ou conexão recusada, mesmo com k3s ativo.
 
-**Causa:** instâncias t2/t3.micro (1GB RAM) ficam sem memória e o API server do k3s para de responder.
+**Causa:** instâncias com pouca RAM (1GB) ficam sem memória e o API server do k3s para de responder.
 
 **Diagnóstico:**
 ```bash
@@ -483,7 +483,7 @@ kubectl get nodes
 
 ---
 
-### Limpeza completa da instância EC2
+### Limpeza completa da VM GCP
 
 Use quando quiser reinstalar tudo do zero:
 
@@ -508,7 +508,7 @@ Após a limpeza, a memória deve estar com ~300MB usados e swap próximo de zero
 ```bash
 git clone https://github.com/<GITHUB_USER>/OrderService-ProjectDevOps.git ~/order-service
 cd ~/order-service
-bash scripts/setup-ec2.sh <GITHUB_USER>
+bash scripts/setup-gcp.sh <GITHUB_USER>
 ```
 
 ---
@@ -517,7 +517,7 @@ bash scripts/setup-ec2.sh <GITHUB_USER>
 
 O `kubectl apply` durante o CI/CD tenta baixar o schema OpenAPI do cluster para validar os manifests, o que sobrecarrega o API server.
 
-**Solução já aplicada no pipeline:** todos os `kubectl apply` usam `--validate=false` e o k3s é reiniciado no início do job de deploy para liberar memória antes da aplicação dos manifests.
+**Solução já aplicada no pipeline:** todos os `kubectl apply` usam `--validate=false`.
 
 ---
 
@@ -530,7 +530,7 @@ Este projeto demonstra a implementação prática de um **pipeline DevOps comple
 - **Containerização** — aplicação empacotada em imagem Docker otimizada com multi-stage build
 - **Orquestração** — Kubernetes gerencia réplicas, self-healing, probes e rolling updates
 - **Persistência de dados** — PostgreSQL com PersistentVolumeClaim, dados sobrevivem a reinícios
-- **Deploy em Cloud** — cluster k3s real rodando em instância AWS EC2, acessível publicamente
+- **Deploy em Cloud** — cluster k3s real rodando em VM GCP Compute Engine, acessível publicamente
 - **Observabilidade** — métricas Prometheus e health checks integrados desde o início
 - **Segurança** — scan de vulnerabilidades Trivy em cada build, secrets sem hardcoding
 
@@ -538,4 +538,4 @@ O objetivo é mostrar domínio sobre o ciclo completo de entrega de software, de
 
 ---
 
-Desenvolvido por **Matheus Santos Caldas**
+2026 — desenvolvido por **Matheus Santos**

@@ -6,7 +6,7 @@ from .database import get_db
 from .db_models import OrderTable
 from .models import Order, OrderCreate, OrderStatus, StatusUpdate
 
-router = APIRouter(tags=["Orders"])
+router = APIRouter()
 
 
 @router.post("/orders", response_model=Order, status_code=201)

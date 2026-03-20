@@ -1,6 +1,6 @@
 def get_docs_html() -> str:
     return """<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -201,9 +201,12 @@ def get_docs_html() -> str:
             font-weight: 700 !important;
             color: var(--text) !important;
             padding: 8px 0 !important;
+            pointer-events: none !important;
+            cursor: default !important;
         }
         .swagger-ui .opblock-tag:hover { background: var(--surface-hover) !important; }
         .swagger-ui .opblock-tag small { color: var(--text-muted) !important; }
+        .swagger-ui .opblock-tag .expand-operation { display: none !important; }
 
         .swagger-ui .opblock-summary-description { color: var(--text-secondary) !important; }
         .swagger-ui .opblock-summary-path { font-family: 'SF Mono','Fira Code',monospace !important; }
@@ -494,7 +497,7 @@ def get_docs_html() -> str:
 
 <div id="swagger-ui"></div>
 
-<footer>Desenvolvido por <strong>Matheus Santos Caldas</strong></footer>
+<footer>2026 — desenvolvido por <strong>Matheus Santos</strong></footer>
 
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
 <script>
@@ -571,7 +574,7 @@ def get_docs_html() -> str:
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
         layout:  'BaseLayout',
         deepLinking:           true,
-        docExpansion:          'list',
+        docExpansion:          'full',
         defaultModelsExpandDepth: -1,
         displayRequestDuration: true,
     });

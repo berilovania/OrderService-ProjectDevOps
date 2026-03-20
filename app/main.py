@@ -39,20 +39,12 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-openapi_tags = [
-    {
-        "name": "Orders",
-        "description": "CRUD operations for order management",
-    }
-]
-
 app = FastAPI(
     title="Order Service",
     description="REST API for order management | DevOps Project",
     version="1.0.0",
     docs_url=None,
     redoc_url=None,
-    openapi_tags=openapi_tags,
     lifespan=lifespan,
 )
 
@@ -77,7 +69,7 @@ def favicon():
     return HTMLResponse(status_code=204)
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 async def health():
     from sqlalchemy import text
 
@@ -90,4 +82,4 @@ async def health():
 
 
 instrumentator.instrument(app)
-instrumentator.expose(app, include_in_schema=True)
+instrumentator.expose(app, include_in_schema=False)

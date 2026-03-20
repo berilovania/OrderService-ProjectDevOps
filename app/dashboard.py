@@ -1,6 +1,6 @@
 def get_dashboard_html():
     return """<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -538,7 +538,7 @@ def get_dashboard_html():
 
 </div>
 
-<footer>Desenvolvido por <strong>Matheus Santos Caldas</strong></footer>
+<footer>2026 — desenvolvido por <strong>Matheus Santos</strong></footer>
 
 <div id="toasts"></div>
 
