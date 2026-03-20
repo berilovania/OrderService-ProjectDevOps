@@ -44,7 +44,7 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │                      │                                               │
 │                      ▼                                               │
 │   ┌──────────────────────────────────────────────┐                   │
-│   │       GCP Compute Engine (Ubuntu 22.04)       │                   │
+│   │       GCP Compute Engine (Ubuntu 22.04)      │                   │
 │   │                                              │                   │
 │   │   ┌──────────────────────────────────────┐   │                   │
 │   │   │          Cluster k3s                 │   │                   │
