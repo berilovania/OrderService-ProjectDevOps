@@ -13,7 +13,11 @@ DATABASE_URL = (
     f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
 )
 
-engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"timeout": 10},
+)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
