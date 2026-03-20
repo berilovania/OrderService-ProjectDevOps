@@ -46,6 +46,14 @@ kubectl create secret docker-registry ghcr-secret \
   -n order-service \
   --dry-run=client -o yaml | kubectl apply -f -
 
+echo "==> Creating postgres secret..."
+kubectl create secret generic postgres-secret \
+  --from-literal=POSTGRES_PASSWORD="${DB_PASSWORD}" \
+  --from-literal=POSTGRES_USER="orders" \
+  --from-literal=POSTGRES_DB="orders" \
+  --namespace order-service \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 echo "==> Patching default service account..."
 kubectl patch serviceaccount default \
   -n order-service \
