@@ -63,16 +63,26 @@ kubectl apply -f k8s/postgres-service.yaml
 kubectl apply -f k8s/postgres-statefulset.yaml
 kubectl apply -f k8s/service.yaml
 
-echo "==> Waiting for PostgreSQL StatefulSet..."
-kubectl rollout status statefulset/postgres -n order-service --timeout=180s
+echo "==> Waiting for PostgreSQL pod to be Running..."
+for i in $(seq 1 36); do
+  STATUS=$(kubectl get pods -n order-service -l app=postgres --no-headers 2>/dev/null | awk '{print $3}' | head -1)
+  echo "  postgres status: ${STATUS:-Pending} (${i}/36)"
+  [ "$STATUS" = "Running" ] && break
+  sleep 5
+done
 
 sleep 10
 
 echo "==> Applying app deployment..."
 kubectl apply -f k8s/deployment.yaml
 
-echo "==> Waiting for order-service rollout..."
-kubectl rollout status deployment/order-service -n order-service --timeout=180s
+echo "==> Waiting for order-service pod to be Running..."
+for i in $(seq 1 60); do
+  STATUS=$(kubectl get pods -n order-service -l app=order-service --no-headers 2>/dev/null | awk '{print $3}' | head -1)
+  echo "  order-service status: ${STATUS:-Pending} (${i}/60)"
+  [ "$STATUS" = "Running" ] && break
+  sleep 5
+done
 
 echo ""
 echo "==> Setup complete!"
