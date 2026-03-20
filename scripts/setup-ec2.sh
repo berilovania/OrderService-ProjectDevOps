@@ -14,8 +14,8 @@ IMAGE="ghcr.io/${GITHUB_USER}/${IMAGE_NAME}:latest"
 echo "==> Updating system..."
 sudo apt-get update && sudo apt-get upgrade -y
 
-echo "==> Installing k3s..."
-curl -sfL https://get.k3s.io | sh -
+echo "==> Installing k3s (kubeconfig readable by ubuntu user)..."
+curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
 
 echo "==> Configuring kubectl for current user..."
 mkdir -p ~/.kube
@@ -45,25 +45,28 @@ kubectl patch serviceaccount default \
   -n order-service \
   -p '{"imagePullSecrets": [{"name": "ghcr-secret"}]}'
 
-echo "==> Replacing placeholders in manifests..."
+echo "==> Replacing placeholders in deployment manifest..."
 sed -i "s|__GITHUB_USER__|${GITHUB_USER}|g" k8s/deployment.yaml
 sed -i "s|__IMAGE_NAME__|${IMAGE_NAME}|g" k8s/deployment.yaml
-sed -i "s|__DB_PASSWORD__|${DB_PASSWORD}|g" k8s/postgres-secret.yaml
 
 echo "==> Applying Kubernetes manifests..."
 kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/postgres-secret.yaml
-kubectl apply -f k8s/postgres-pvc.yaml
-kubectl apply -f k8s/postgres-deployment.yaml
+kubectl apply -f k8s/postgres-configmap.yaml
+kubectl apply -f k8s/postgres-headless-service.yaml
 kubectl apply -f k8s/postgres-service.yaml
-kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/postgres-statefulset.yaml
 kubectl apply -f k8s/service.yaml
 
-echo "==> Waiting for PostgreSQL..."
-kubectl rollout status deployment/postgres -n order-service --timeout=120s
+echo "==> Waiting for PostgreSQL StatefulSet..."
+kubectl rollout status statefulset/postgres -n order-service --timeout=180s
+
+sleep 10
+
+echo "==> Applying app deployment..."
+kubectl apply -f k8s/deployment.yaml
 
 echo "==> Waiting for order-service rollout..."
-kubectl rollout status deployment/order-service -n order-service --timeout=120s
+kubectl rollout status deployment/order-service -n order-service --timeout=180s
 
 echo ""
 echo "==> Setup complete!"

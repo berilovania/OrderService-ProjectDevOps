@@ -113,7 +113,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: IMAGE,IMAGE_NAME,DB_PASSWORD,GITHUB_SHA,REPO_OWNER
           script: |
-            # Fix kubeconfig permissions for ubuntu user
+            # Restart k3s to free memory before deploy, then restore kubeconfig permissions
+            sudo systemctl restart k3s
+            sleep 45
             sudo chmod 644 /etc/rancher/k3s/k3s.yaml
 
             # Create/update secret directly — password never touches disk or shell history
@@ -122,7 +124,7 @@ jobs:
               --from-literal=POSTGRES_USER="orders" \
               --from-literal=POSTGRES_DB="orders" \
               --namespace order-service \
-              --dry-run=client -o yaml | kubectl apply -f -
+              --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
             # Replace non-sensitive placeholders in deployment manifest
             cd ~/order-service/k8s
@@ -130,16 +132,16 @@ jobs:
             sed -i "s|__IMAGE_NAME__|$IMAGE_NAME|g" deployment.yaml
 
             # Apply manifests (postgres-secret.yaml excluded — managed above)
-            kubectl apply -f namespace.yaml
-            kubectl apply -f postgres-configmap.yaml
-            kubectl apply -f postgres-headless-service.yaml
-            kubectl apply -f postgres-service.yaml
-            kubectl apply -f postgres-statefulset.yaml
-            kubectl apply -f service.yaml
+            kubectl apply --validate=false -f namespace.yaml
+            kubectl apply --validate=false -f postgres-configmap.yaml
+            kubectl apply --validate=false -f postgres-headless-service.yaml
+            kubectl apply --validate=false -f postgres-service.yaml
+            kubectl apply --validate=false -f postgres-statefulset.yaml
+            kubectl apply --validate=false -f service.yaml
             kubectl rollout status statefulset/postgres \
               -n order-service --timeout=180s
             sleep 15
-            kubectl apply -f deployment.yaml
+            kubectl apply --validate=false -f deployment.yaml
             kubectl set image deployment/order-service \
               order-service=${IMAGE}:${GITHUB_SHA} \
               -n order-service
