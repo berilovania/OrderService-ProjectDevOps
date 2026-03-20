@@ -98,7 +98,7 @@ run_cycle() {
       -d "$payload")
 
     local order_id
-    order_id=$(echo "$response" | python -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null)
+    order_id=$(echo "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null)
 
     if [[ -n "$order_id" ]]; then
       created_ids+=("$order_id")
@@ -156,7 +156,7 @@ run_cycle() {
 if ! $QUIET; then
   echo "==> Targeting: ${BASE_URL}"
   echo -e "\n--- Health Check ---"
-  curl -s "${BASE_URL}/health" | python -m json.tool
+  curl -s "${BASE_URL}/health" | python3 -m json.tool
 fi
 
 if $LOOP; then
@@ -178,7 +178,7 @@ else
   run_cycle
 
   log -e "\n--- Final State ---"
-  $QUIET || curl -s "${BASE_URL}/orders" | python -m json.tool
+  $QUIET || curl -s "${BASE_URL}/orders" | python3 -m json.tool
 
   log -e "\n--- Metrics (first 20 lines) ---"
   $QUIET || curl -s "${BASE_URL}/metrics" | head -20
