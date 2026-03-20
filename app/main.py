@@ -71,6 +71,7 @@ def favicon():
 
 @app.get("/health", include_in_schema=False)
 async def health():
+    from fastapi.responses import JSONResponse
     from sqlalchemy import text
 
     try:
@@ -78,7 +79,10 @@ async def health():
             await conn.execute(text("SELECT 1"))
         return {"status": "healthy", "database": "connected"}
     except Exception:
-        return {"status": "unhealthy", "database": "disconnected"}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "disconnected"},
+        )
 
 
 instrumentator.instrument(app)

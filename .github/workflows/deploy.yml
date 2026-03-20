@@ -134,7 +134,14 @@ jobs:
             kubectl apply --validate=false -f service.yaml
             kubectl rollout status deployment/postgres \
               -n order-service --timeout=180s
-            sleep 15
+            echo "Waiting for PostgreSQL to accept connections..."
+            for i in $(seq 1 30); do
+              if kubectl exec -n order-service deploy/postgres -- pg_isready -U orders -q 2>/dev/null; then
+                echo "PostgreSQL ready after ${i}x2s"
+                break
+              fi
+              sleep 2
+            done
             kubectl apply --validate=false -f deployment.yaml
             kubectl set image deployment/order-service \
               order-service=${IMAGE}:${GITHUB_SHA} \
