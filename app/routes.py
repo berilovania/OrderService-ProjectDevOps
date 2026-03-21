@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .auth import require_api_key
 from .database import get_db
 from .db_models import OrderTable
 from .models import Order, OrderCreate, OrderStatus, StatusUpdate
@@ -9,7 +10,7 @@ from .models import Order, OrderCreate, OrderStatus, StatusUpdate
 router = APIRouter()
 
 
-@router.post("/orders", response_model=Order, status_code=201)
+@router.post("/orders", response_model=Order, status_code=201, dependencies=[Depends(require_api_key)])
 async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)):
     order = Order(**payload.model_dump())
     row = OrderTable(
@@ -28,7 +29,7 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
 @router.get("/orders", response_model=list[Order])
 async def list_orders(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(200, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -46,7 +47,7 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
     return _row_to_order(row)
 
 
-@router.patch("/orders/{order_id}/status", response_model=Order)
+@router.patch("/orders/{order_id}/status", response_model=Order, dependencies=[Depends(require_api_key)])
 async def update_order_status(
     order_id: str, payload: StatusUpdate, db: AsyncSession = Depends(get_db)
 ):
@@ -61,7 +62,7 @@ async def update_order_status(
     return _row_to_order(row)
 
 
-@router.delete("/orders/{order_id}", response_model=Order)
+@router.delete("/orders/{order_id}", response_model=Order, dependencies=[Depends(require_api_key)])
 async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(OrderTable, order_id)
     if row is None:

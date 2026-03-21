@@ -15,6 +15,9 @@ COPY --from=builder /install /usr/local
 COPY app/ app/
 COPY favicon.ico .
 
+RUN addgroup --system --gid 1000 app && adduser --system --uid 1000 --ingroup app app
+USER app
+
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

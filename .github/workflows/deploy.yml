@@ -105,21 +105,23 @@ jobs:
           IMAGE: ${{ env.IMAGE }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          API_KEY: ${{ secrets.API_KEY }}
           GITHUB_SHA: ${{ github.sha }}
           REPO_OWNER: ${{ github.repository_owner }}
         with:
           host: ${{ secrets.GCP_HOST }}
           username: gcp
           key: ${{ secrets.GCP_SSH_KEY }}
-          envs: IMAGE,IMAGE_NAME,DB_PASSWORD,GITHUB_SHA,REPO_OWNER
+          envs: IMAGE,IMAGE_NAME,DB_PASSWORD,API_KEY,GITHUB_SHA,REPO_OWNER
           script: |
             # Create/update secret directly — password never touches disk or shell history
             kubectl create secret generic postgres-secret \
               --from-literal=POSTGRES_PASSWORD="$DB_PASSWORD" \
               --from-literal=POSTGRES_USER="orders" \
               --from-literal=POSTGRES_DB="orders" \
+              --from-literal=API_KEY="${API_KEY:-}" \
               --namespace order-service \
-              --dry-run=client -o yaml | kubectl apply --validate=false -f -
+              --dry-run=client -o yaml | kubectl apply -f -
 
             # Replace non-sensitive placeholders in deployment manifest
             cd ~/order-service/k8s
@@ -127,22 +129,24 @@ jobs:
             sed -i "s|__IMAGE_NAME__|$IMAGE_NAME|g" deployment.yaml
 
             # Apply manifests (postgres-secret.yaml excluded — managed above)
-            kubectl apply --validate=false -f namespace.yaml
-            kubectl apply --validate=false -f postgres-pvc.yaml
-            kubectl apply --validate=false -f postgres-deployment.yaml
-            kubectl apply --validate=false -f postgres-service.yaml
-            kubectl apply --validate=false -f service.yaml
-            kubectl rollout status deployment/postgres \
+            kubectl apply -f namespace.yaml
+            kubectl apply -f postgres-pvc.yaml
+            # Migrate from Deployment to StatefulSet (one-time, safe to repeat)
+            kubectl delete deployment postgres -n order-service --ignore-not-found
+            kubectl apply -f postgres-deployment.yaml
+            kubectl apply -f postgres-service.yaml
+            kubectl apply -f service.yaml
+            kubectl rollout status statefulset/postgres \
               -n order-service --timeout=180s
             echo "Waiting for PostgreSQL to accept connections..."
             for i in $(seq 1 30); do
-              if kubectl exec -n order-service deploy/postgres -- pg_isready -U orders -q 2>/dev/null; then
+              if kubectl exec -n order-service postgres-0 -- pg_isready -U orders -q 2>/dev/null; then
                 echo "PostgreSQL ready after ${i}x2s"
                 break
               fi
               sleep 2
             done
-            kubectl apply --validate=false -f deployment.yaml
+            kubectl apply -f deployment.yaml
             kubectl set image deployment/order-service \
               order-service=${IMAGE}:${GITHUB_SHA} \
               -n order-service

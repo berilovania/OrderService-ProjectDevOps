@@ -158,7 +158,7 @@ def get_dashboard_html():
         }
         .stat.s-total::after   { background: var(--primary); }
         .stat.s-created::after { background: var(--warning); }
-        .stat.s-proc::after    { background: var(--info); }
+        .stat.s-cancel::after  { background: var(--danger); }
         .stat.s-done::after    { background: var(--success); }
 
         .stat-label {
@@ -280,11 +280,31 @@ def get_dashboard_html():
         /* ── Pagination ─────────────────────────── */
         #pager {
             display: none; align-items: center; justify-content: center;
-            gap: 12px; padding: 10px 0; margin-bottom: 18px;
+            gap: 4px; padding: 10px 0; margin-bottom: 18px;
+            flex-wrap: wrap;
         }
-        #pager-info {
-            font-size: 0.85em; color: var(--text-muted);
-            min-width: 64px; text-align: center; font-weight: 500;
+        .pg-btn {
+            min-width: 34px; height: 34px; border-radius: var(--radius-sm);
+            border: 1px solid var(--border); background: var(--surface);
+            color: var(--text-secondary); cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.82em; font-weight: 600;
+            transition: background var(--transition), border-color var(--transition), color var(--transition);
+            padding: 0 6px;
+        }
+        .pg-btn:hover:not(:disabled) {
+            background: var(--primary-light); color: var(--primary);
+            border-color: var(--primary-muted);
+        }
+        .pg-btn:disabled { opacity: 0.35; cursor: default; }
+        .pg-btn.active {
+            background: var(--primary); color: #fff;
+            border-color: var(--primary);
+        }
+        .pg-dots {
+            min-width: 28px; height: 34px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.8em; color: var(--text-muted); user-select: none;
         }
 
         /* ── Endpoints table ────────────────────── */
@@ -411,15 +431,16 @@ def get_dashboard_html():
         Order Service
     </a>
     <div class="nav-links">
+        <a class="nav-link active" href="/" data-i18n="nav.home">Dashboard</a>
+        <a class="nav-link" href="/docs" data-i18n="nav.docs">Docs</a>
+        <a class="nav-link" href="/metrics">Metrics</a>
+        <a class="nav-link" href="/health">Health</a>
+        <div class="nav-divider"></div>
         <div class="nav-status">
             <div class="pulse-dot"></div>
             <span data-i18n="nav.operational">Operacional</span>
         </div>
         <div class="nav-divider"></div>
-        <a class="nav-link active" href="/" data-i18n="nav.home">Dashboard</a>
-        <a class="nav-link" href="/docs" data-i18n="nav.docs">Docs</a>
-        <a class="nav-link" href="/metrics">Metrics</a>
-        <a class="nav-link" href="/health">Health</a>
         <div class="lang-selector" id="lang-selector">
             <button class="lang-toggle" id="lang-toggle" onclick="toggleLangMenu()">
                 <span id="lang-flag">🇧🇷</span>
@@ -452,9 +473,9 @@ def get_dashboard_html():
             <div class="stat-label" data-i18n="stat.created">Criados</div>
             <div class="stat-num" id="s-created">—</div>
         </div>
-        <div class="stat s-proc">
-            <div class="stat-label" data-i18n="stat.processing">Processando</div>
-            <div class="stat-num" id="s-proc">—</div>
+        <div class="stat s-cancel">
+            <div class="stat-label" data-i18n="stat.cancelled">Cancelados</div>
+            <div class="stat-num" id="s-cancel">—</div>
         </div>
         <div class="stat s-done">
             <div class="stat-label" data-i18n="stat.completed">Concluídos</div>
@@ -482,15 +503,7 @@ def get_dashboard_html():
         </div>
     </div>
 
-    <div id="pager">
-        <button class="btn btn-ghost" id="pager-prev" onclick="goToPage(-1)">
-            ← <span data-i18n="pager.prev">Anterior</span>
-        </button>
-        <span id="pager-info">1 / 1</span>
-        <button class="btn btn-ghost" id="pager-next" onclick="goToPage(1)">
-            <span data-i18n="pager.next">Próxima</span> →
-        </button>
-    </div>
+    <div id="pager"></div>
 
     <div class="card">
         <div class="card-head">
@@ -553,7 +566,7 @@ const TR = {
         'nav.docs':        'Docs',
         'stat.total':      'Total',
         'stat.created':    'Criados',
-        'stat.processing': 'Processando',
+        'stat.cancelled':  'Cancelados',
         'stat.completed':  'Concluídos',
         'orders.title':    'Pedidos',
         'btn.refresh':     'Atualizar',
@@ -590,7 +603,7 @@ const TR = {
         'nav.docs':        'Docs',
         'stat.total':      'Total',
         'stat.created':    'Created',
-        'stat.processing': 'Processing',
+        'stat.cancelled':  'Cancelled',
         'stat.completed':  'Completed',
         'orders.title':    'Orders',
         'btn.refresh':     'Refresh',
@@ -688,7 +701,10 @@ window.addEventListener('storage', e => {
 function toast(msg, type = 'ok') {
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.innerHTML = `<span>${type === 'ok' ? '✓' : '✗'}</span> ${msg}`;
+    const icon = document.createElement('span');
+    icon.textContent = type === 'ok' ? '\u2713' : '\u2717';
+    el.appendChild(icon);
+    el.appendChild(document.createTextNode(' ' + msg));
     document.getElementById('toasts').appendChild(el);
     setTimeout(() => {
         el.style.animation = 'toastOut 0.3s ease forwards';
@@ -701,7 +717,7 @@ function updateStats(orders) {
     const s = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
     s('s-total',   orders.length);
     s('s-created', orders.filter(o=>o.status==='created').length);
-    s('s-proc',    orders.filter(o=>o.status==='processing').length);
+    s('s-cancel',  orders.filter(o=>o.status==='cancelled').length);
     s('s-done',    orders.filter(o=>o.status==='completed').length);
 }
 
@@ -713,27 +729,49 @@ function buildRow(order, isNew = false) {
     row.dataset.id = order.id;
     row.dataset.status = order.status;
 
-    row.innerHTML = `
-        <div class="order-icon">${ICONS[order.status] ?? '⚪'}</div>
-        <div class="order-info">
-            <div class="order-customer">${order.customer}</div>
-            <div class="order-meta">#${order.id.substring(0,8)} · ${order.items.join(', ')}</div>
-        </div>
-        <span class="badge ${isNew ? 'b-new' : BADGE[order.status]}">
-            ${isNew ? t('status.new') : LABELS[order.status]}
-        </span>
-        <div class="order-total">R$ ${order.total.toFixed(2)}</div>
-        <button class="del-btn" title="${t('ep.cancel')}" onclick="deleteOrder('${order.id}')">✕</button>`;
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'order-icon';
+    iconDiv.textContent = ICONS[order.status] ?? '\u26aa';
+    row.appendChild(iconDiv);
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'order-info';
+    const custDiv = document.createElement('div');
+    custDiv.className = 'order-customer';
+    custDiv.textContent = order.customer;
+    infoDiv.appendChild(custDiv);
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'order-meta';
+    metaDiv.textContent = '#' + order.id.substring(0,8) + ' \u00b7 ' + order.items.join(', ');
+    infoDiv.appendChild(metaDiv);
+    row.appendChild(infoDiv);
+
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + (isNew ? 'b-new' : BADGE[order.status]);
+    badge.textContent = isNew ? t('status.new') : LABELS[order.status];
+    row.appendChild(badge);
+
+    const totalDiv = document.createElement('div');
+    totalDiv.className = 'order-total';
+    totalDiv.textContent = 'R$ ' + order.total.toFixed(2);
+    row.appendChild(totalDiv);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del-btn';
+    delBtn.title = t('ep.cancel');
+    delBtn.textContent = '\u2715';
+    delBtn.addEventListener('click', function() { deleteOrder(order.id); });
+    row.appendChild(delBtn);
 
     if (isNew) {
         setTimeout(() => {
             row.style.transition = 'background 0.9s ease, border-left 0.9s ease';
             row.classList.remove('just-created');
-            const badge = row.querySelector('.badge');
-            if (badge) {
-                badge.style.transition = 'background 0.6s ease, color 0.6s ease';
-                badge.className = `badge ${BADGE[order.status]}`;
-                badge.textContent = LABELS[order.status];
+            const b = row.querySelector('.badge');
+            if (b) {
+                b.style.transition = 'background 0.6s ease, color 0.6s ease';
+                b.className = 'badge ' + BADGE[order.status];
+                b.textContent = LABELS[order.status];
             }
         }, 2500);
     }
@@ -752,36 +790,88 @@ function emptyHTML() {
 
 // ── Pagination ────────────────────────────
 const PAGE_SIZE = 10;
+const MAX_VISIBLE_PAGES = 8;
 let currentPage = 1;
 let ordersCache = null;
 let lastNewId   = null;
 
-function updatePagination(total) {
+function buildPager(totalPages) {
     const pager = document.getElementById('pager');
     if (!pager) return;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    pager.style.display = total > PAGE_SIZE ? 'flex' : 'none';
-    document.getElementById('pager-info').textContent = `${currentPage} / ${totalPages}`;
-    document.getElementById('pager-prev').disabled = currentPage <= 1;
-    document.getElementById('pager-next').disabled = currentPage >= totalPages;
+    if (totalPages <= 1) { pager.style.display = 'none'; return; }
+    pager.style.display = 'flex';
+    pager.innerHTML = '';
+
+    function addBtn(label, page, disabled, active) {
+        const btn = document.createElement('button');
+        btn.className = 'pg-btn' + (active ? ' active' : '');
+        btn.textContent = label;
+        btn.disabled = disabled;
+        if (!disabled && !active) btn.addEventListener('click', function() { goToPage(page); });
+        pager.appendChild(btn);
+    }
+
+    // First & Prev
+    addBtn('\u00ab', 1, currentPage === 1, false);
+    addBtn('\u2039', currentPage - 1, currentPage === 1, false);
+
+    // Page numbers with windowing
+    let startPage = 1, endPage = totalPages;
+    if (totalPages > MAX_VISIBLE_PAGES) {
+        const half = Math.floor(MAX_VISIBLE_PAGES / 2);
+        startPage = Math.max(1, currentPage - half);
+        endPage = startPage + MAX_VISIBLE_PAGES - 1;
+        if (endPage > totalPages) {
+            endPage = totalPages;
+            startPage = Math.max(1, endPage - MAX_VISIBLE_PAGES + 1);
+        }
+    }
+
+    if (startPage > 1) {
+        addBtn('1', 1, false, currentPage === 1);
+        if (startPage > 2) {
+            const dots = document.createElement('span');
+            dots.className = 'pg-dots';
+            dots.textContent = '\u2026';
+            pager.appendChild(dots);
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === 1 && startPage > 1) continue;
+        if (i === totalPages && endPage < totalPages) continue;
+        addBtn(String(i), i, false, i === currentPage);
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const dots = document.createElement('span');
+            dots.className = 'pg-dots';
+            dots.textContent = '\u2026';
+            pager.appendChild(dots);
+        }
+        addBtn(String(totalPages), totalPages, false, currentPage === totalPages);
+    }
+
+    // Next & Last
+    addBtn('\u203a', currentPage + 1, currentPage === totalPages, false);
+    addBtn('\u00bb', totalPages, currentPage === totalPages, false);
 }
 
-function goToPage(delta) {
+function goToPage(page) {
     if (!ordersCache) return;
     const totalPages = Math.max(1, Math.ceil(ordersCache.length / PAGE_SIZE));
-    const next = currentPage + delta;
-    if (next < 1 || next > totalPages) return;
-    currentPage = next;
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
     renderPage(ordersCache);
 }
 
 function renderPage(orders) {
     const list = document.getElementById('orders-list');
-    const reversed = [...orders].reverse();
     const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
     if (currentPage > totalPages) currentPage = totalPages;
     const start = (currentPage - 1) * PAGE_SIZE;
-    const pageOrders = reversed.slice(start, start + PAGE_SIZE);
+    const pageOrders = orders.slice(start, start + PAGE_SIZE);
 
     list.innerHTML = '';
     if (orders.length === 0) {
@@ -793,7 +883,7 @@ function renderPage(orders) {
         });
     }
     updateStats(orders);
-    updatePagination(orders.length);
+    buildPager(Math.max(1, Math.ceil(orders.length / PAGE_SIZE)));
 }
 
 // ── Smart render ──────────────────────────
@@ -810,7 +900,7 @@ function smartRender(orders) {
 // ── Load ──────────────────────────────────
 async function loadOrders() {
     try {
-        const res = await fetch(`${BASE}/orders`);
+        const res = await fetch(`${BASE}/orders?limit=1000`);
         if (!res.ok) return;
         smartRender(await res.json());
     } catch { /* silent */ }

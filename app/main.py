@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 
 from .dashboard import get_dashboard_html
 from .database import engine, init_db, async_session
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Order Service",
     description="REST API for order management | DevOps Project",
-    version="1.0.0",
+    version="2.0.0",
     docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
@@ -86,4 +86,21 @@ async def health():
 
 
 instrumentator.instrument(app)
-instrumentator.expose(app, include_in_schema=False)
+
+API_KEY = os.getenv("API_KEY", "")
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics_endpoint(request: Request):
+    client_ip = request.client.host if request.client else ""
+    is_internal = client_ip in ("127.0.0.1", "::1") or client_ip.startswith(("10.", "172."))
+
+    api_key = request.headers.get("X-API-Key", "")
+    has_valid_key = bool(API_KEY) and api_key == API_KEY
+
+    if not (is_internal or has_valid_key):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+    return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)

@@ -15,6 +15,7 @@ A aplicação — uma API REST de gerenciamento de pedidos construída com FastA
 - **Deploy real em nuvem** — cluster Kubernetes rodando em VM GCP Compute Engine
 - **Boas práticas de containerização** — imagem Docker otimizada com multi-stage build
 - **Observabilidade** — métricas Prometheus, health checks e probes de liveness/readiness
+- **Segurança em camadas** — autenticação por API Key, container não-root, securityContext, scan de vulnerabilidades
 
 ---
 
@@ -57,9 +58,9 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │   │                │                     │   │                   │
 │   │   │                ▼                     │   │                   │
 │   │   │   ┌────────────────────────────┐     │   │                   │
-│   │   │   │   PostgreSQL 16 (1 pod)    │     │   │                   │
+│   │   │   │   PostgreSQL 16 (StatefulSet)│    │   │                   │
 │   │   │   │   PVC 1Gi persistente      │     │   │                   │
-│   │   │   │   porta 5432 (ClusterIP)   │     │   │                   │
+│   │   │   │   porta 5432 (Headless)    │     │   │                   │
 │   │   │   │                            │     │   │                   │
 │   │   │   └────────────────────────────┘     │   │                   │
 │   │   │                                      │   │                   │
@@ -145,10 +146,10 @@ Constrói e verifica a segurança da imagem antes de publicá-la:
 Aplica a nova versão no cluster Kubernetes:
 - Copia os manifests `k8s/` via SCP para a VM GCP
 - Conecta na VM GCP via SSH e executa:
-  - Criação/atualização do Secret do PostgreSQL (direto no cluster, sem gravar em disco)
+  - Criação/atualização do Secret (PostgreSQL + API Key, direto no cluster, sem gravar em disco)
   - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`)
-  - `kubectl apply` em todos os manifests (namespace, secrets, volumes, deployments, services)
-  - Aguarda o Deployment do PostgreSQL ficar pronto (timeout: 180s)
+  - `kubectl apply` em todos os manifests com validação habilitada
+  - Aguarda o StatefulSet do PostgreSQL ficar pronto (timeout: 180s)
   - `kubectl set image` para atualizar a imagem do deployment com o SHA do commit
   - `kubectl rollout status` para aguardar o rolling update (timeout: 600s)
   - Em caso de falha: imprime diagnóstico automático (status dos pods, eventos, logs)
@@ -160,6 +161,7 @@ Aplica a nova versão no cluster Kubernetes:
 | `GCP_HOST` | External IP da VM GCP |
 | `GCP_SSH_KEY` | Chave privada SSH |
 | `DB_PASSWORD` | Senha do PostgreSQL para o cluster |
+| `API_KEY` | Chave de autenticação para endpoints de escrita (opcional — se vazio, auth desabilitada) |
 
 > O `GITHUB_TOKEN` é provido automaticamente pelo GitHub Actions com permissões de `contents: read` e `packages: write`.
 
@@ -183,6 +185,11 @@ FROM python:3.12-slim
 WORKDIR /project
 COPY --from=builder /install /usr/local
 COPY app/ app/
+
+# Usuário não-privilegiado (UID 1000 alinhado com securityContext do k8s)
+RUN addgroup --system --gid 1000 app && adduser --system --uid 1000 --ingroup app app
+USER app
+
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
@@ -192,7 +199,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 - **Imagem leve** — a imagem final não contém ferramentas de build, headers de compilação ou cache do pip
 - **Reprodutibilidade** — o mesmo Dockerfile gera imagens idênticas em qualquer ambiente
 - **Portabilidade** — a imagem roda em qualquer host com Docker, do laptop do desenvolvedor ao cluster Kubernetes
-- **Segurança** — superfície de ataque reduzida por não incluir pacotes desnecessários
+- **Segurança** — container roda como usuário não-root (`app`, UID 1000), superfície de ataque reduzida
 
 ### Desenvolvimento local com Docker Compose
 
@@ -216,14 +223,17 @@ A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 - **Readiness probe** — verifica `/health` a cada 10s. Pods que não estão prontos são **removidos do balanceamento** até se recuperarem
 - **Resource limits** — cada pod tem limites definidos (CPU: 300m, memória: 192Mi), impedindo que um container monopolize recursos do nó
 - **Credenciais via Secret** — usuário, senha e nome do banco são injetados via `secretKeyRef`, sem hardcoding nos manifests
+- **SecurityContext** — container roda como usuário não-root (UID 1000), filesystem read-only, sem privilege escalation, todas as capabilities Linux removidas
 
-### Deployment — PostgreSQL
+### StatefulSet — PostgreSQL
 
+- **StatefulSet** (em vez de Deployment) — garante identidade estável do pod e gerenciamento seguro de storage para workloads stateful
 - **1 réplica** com `PersistentVolumeClaim` de 1Gi — dados sobrevivem a reinícios e recriações do pod
-- Acessível apenas internamente via **ClusterIP** na porta 5432
+- Acessível apenas internamente via **Headless Service** (`clusterIP: None`) na porta 5432
 - Limites de recursos ajustados para e2-small (2GB RAM): CPU 300m, memória 256Mi
+- **SecurityContext** — `allowPrivilegeEscalation: false`
 
-### Service — NodePort
+### Service — NodePort + Ingress
 
 A aplicação é exposta externamente através de um **Service NodePort** na porta `30080`:
 
@@ -231,7 +241,7 @@ A aplicação é exposta externamente através de um **Service NodePort** na por
 User ──► GCP_IP:30080 ──► Service (NodePort) ──► Pod :8000
 ```
 
-Qualquer requisição na porta 30080 da VM é roteada para um dos pods da aplicação na porta 8000.
+O projeto inclui também um **Ingress NGINX** (`k8s/ingress.yaml`) com rate-limiting (10 req/s), preparado para TLS via cert-manager.
 
 ### Self-healing e resiliência
 
@@ -304,7 +314,53 @@ Os testes são executados automaticamente no job `test` com um container Postgre
 
 ---
 
-## 9. Como Executar e Testar Localmente
+## 9. Segurança
+
+O projeto aplica segurança em múltiplas camadas:
+
+### Autenticação por API Key
+
+Endpoints de escrita (`POST`, `PATCH`, `DELETE`) são protegidos por autenticação via header `X-API-Key`. Endpoints de leitura (`GET`) permanecem públicos.
+
+```bash
+# Sem autenticação — rejeitado (401)
+curl -X POST http://localhost:8000/orders -H "Content-Type: application/json" \
+  -d '{"customer": "Test", "items": ["item1"], "total": 99.90}'
+
+# Com API Key — aceito (201)
+curl -X POST http://localhost:8000/orders -H "Content-Type: application/json" \
+  -H "X-API-Key: sua-chave-aqui" \
+  -d '{"customer": "Test", "items": ["item1"], "total": 99.90}'
+```
+
+> Se a variável de ambiente `API_KEY` estiver vazia ou não definida, a autenticação é desabilitada automaticamente (modo desenvolvimento).
+
+### Métricas protegidas
+
+O endpoint `/metrics` aceita requisições apenas de IPs internos (`127.0.0.1`, redes `10.*`/`172.*`) ou com `X-API-Key` válida. Requisições externas sem chave recebem `403 Forbidden`.
+
+### Container não-root
+
+A imagem Docker roda como usuário `app` (UID 1000), não como root. Isso limita o impacto de uma eventual vulnerabilidade no container.
+
+### SecurityContext no Kubernetes
+
+| Recurso | Configuração |
+|---------|-------------|
+| **order-service** | `runAsNonRoot: true`, `runAsUser: 1000`, `readOnlyRootFilesystem: true`, `drop ALL capabilities`, `allowPrivilegeEscalation: false` |
+| **PostgreSQL** | `allowPrivilegeEscalation: false` |
+
+### Proteção contra XSS
+
+O dashboard interativo (`/`) utiliza construção DOM segura (`createElement` + `textContent`) em vez de `innerHTML` para renderizar dados vindos da API, prevenindo injeção de HTML/JavaScript malicioso.
+
+### Scan de vulnerabilidades
+
+Toda imagem Docker é analisada pelo **Trivy** no pipeline CI/CD. Vulnerabilidades `CRITICAL` ou `HIGH` com correção disponível **bloqueiam o deploy**.
+
+---
+
+## 10. Como Executar e Testar Localmente
 
 ### Pré-requisitos
 
@@ -357,7 +413,7 @@ bash scripts/traffic.sh http://localhost:8000
 
 ---
 
-## 10. Fluxo de Deploy
+## 11. Fluxo de Deploy
 
 O que acontece automaticamente após um `git push origin main`:
 
@@ -396,7 +452,7 @@ O que acontece automaticamente após um `git push origin main`:
 
 ---
 
-## 11. Estrutura do Projeto
+## 12. Estrutura do Projeto
 
 ```
 .
@@ -406,6 +462,7 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── models.py                   # Schemas Pydantic (validação de entrada/saída)
 │   ├── database.py                 # Engine async SQLAlchemy + gerenciamento de sessão
 │   ├── db_models.py                # Modelo ORM mapeando a tabela orders
+│   ├── auth.py                     # Autenticação por API Key (header X-API-Key)
 │   ├── metrics.py                  # Configuração do Prometheus
 │   ├── dashboard.py                # HTML do dashboard interativo (/)
 │   ├── docs_page.py                # HTML do Swagger UI customizado (/docs)
@@ -418,13 +475,15 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── namespace.yaml              # Namespace order-service
 │   ├── postgres-secret.yaml        # Credenciais do banco (placeholder __DB_PASSWORD__)
 │   ├── postgres-pvc.yaml           # Volume persistente de 1Gi
-│   ├── postgres-deployment.yaml    # Deployment do PostgreSQL 16 (1 réplica)
-│   ├── postgres-service.yaml       # Service ClusterIP na porta 5432
-│   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, limits)
-│   └── service.yaml                # Service NodePort na porta 30080
+│   ├── postgres-deployment.yaml    # StatefulSet do PostgreSQL 16 (1 réplica)
+│   ├── postgres-service.yaml       # Headless Service na porta 5432
+│   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, securityContext)
+│   ├── service.yaml                # Service NodePort na porta 30080
+│   └── ingress.yaml                # Ingress NGINX com rate-limiting
 │
 ├── scripts/
 │   ├── setup-gcp.sh                # Provisionamento da VM GCP (k3s + manifests)
+│   ├── setup-ec2.sh                # Provisionamento de VM EC2 (k3s + manifests)
 │   └── traffic.sh                  # Gerador de tráfego realista para testes
 │
 ├── .github/workflows/
@@ -440,22 +499,22 @@ O que acontece automaticamente após um `git push origin main`:
 
 ---
 
-## 12. Melhorias Futuras
+## 13. Melhorias Futuras
 
 | Melhoria | Descrição |
 |----------|-----------|
 | **Observabilidade completa** | Integrar Grafana para dashboards visuais sobre as métricas Prometheus já coletadas |
 | **Auto scaling (HPA)** | Configurar Horizontal Pod Autoscaler para escalar réplicas baseado em CPU/memória |
-| **Ingress Controller** | Substituir NodePort por Ingress com NGINX para roteamento HTTP e terminação TLS |
-| **Certificado SSL** | Adicionar cert-manager + Let's Encrypt para HTTPS automático |
+| **TLS com cert-manager** | Ativar o Ingress NGINX já configurado com cert-manager + Let's Encrypt para HTTPS automático |
 | **Ambientes separados** | Criar namespaces para staging e produção com promoção controlada |
 | **Infrastructure as Code** | Provisionar a VM GCP com Terraform em vez de setup manual |
 | **GitOps com ArgoCD** | Substituir o deploy via SSH por reconciliação declarativa com ArgoCD |
 | **Alertas** | Configurar Alertmanager para notificações em caso de falha nos pods ou métricas anômalas |
+| **NetworkPolicy** | Restringir comunicação entre pods — permitir apenas order-service → postgres |
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### k3s API não responde (`TLS handshake timeout` / `connection refused`)
 
@@ -515,13 +574,13 @@ bash scripts/setup-gcp.sh <GITHUB_USER>
 
 ### Pipeline falha com `error validating data: ... TLS handshake timeout`
 
-O `kubectl apply` durante o CI/CD tenta baixar o schema OpenAPI do cluster para validar os manifests, o que sobrecarrega o API server.
+O `kubectl apply` tenta baixar o schema OpenAPI do cluster para validar os manifests, o que pode sobrecarregar o API server em instâncias com pouca RAM.
 
-**Solução já aplicada no pipeline:** todos os `kubectl apply` usam `--validate=false`.
+**Solução:** reiniciar o k3s para liberar memória (ver seção acima). O pipeline usa validação habilitada para garantir que manifests incorretos sejam detectados antes do deploy.
 
 ---
 
-## 14. Conclusão
+## 15. Conclusão
 
 Este projeto demonstra a implementação prática de um **pipeline DevOps completo**, abrangendo:
 
@@ -532,7 +591,7 @@ Este projeto demonstra a implementação prática de um **pipeline DevOps comple
 - **Persistência de dados** — PostgreSQL com PersistentVolumeClaim, dados sobrevivem a reinícios
 - **Deploy em Cloud** — cluster k3s real rodando em VM GCP Compute Engine, acessível publicamente
 - **Observabilidade** — métricas Prometheus e health checks integrados desde o início
-- **Segurança** — scan de vulnerabilidades Trivy em cada build, secrets sem hardcoding
+- **Segurança em camadas** — autenticação por API Key, containers não-root, securityContext restritivo, proteção contra XSS, scan Trivy em cada build, secrets sem hardcoding
 
 O objetivo é mostrar domínio sobre o ciclo completo de entrega de software, desde o commit até a aplicação rodando em produção, com automação, reprodutibilidade e boas práticas de engenharia.
 

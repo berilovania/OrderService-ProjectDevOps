@@ -574,10 +574,21 @@ def get_docs_html() -> str:
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
         layout:  'BaseLayout',
         deepLinking:           true,
-        docExpansion:          'full',
+        docExpansion:          'none',
         defaultModelsExpandDepth: -1,
         displayRequestDuration: true,
+        defaultModelRendering: 'model',
     });
+
+    // Hide the "default" tag header
+    const observer = new MutationObserver(() => {
+        document.querySelectorAll('.opblock-tag').forEach(tag => {
+            if (tag.getAttribute('data-tag') === 'default') {
+                tag.style.display = 'none';
+            }
+        });
+    });
+    observer.observe(document.getElementById('swagger-ui'), { childList: true, subtree: true });
 </script>
 </body>
 </html>"""

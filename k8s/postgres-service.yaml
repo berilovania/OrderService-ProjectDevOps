@@ -4,6 +4,7 @@ metadata:
   name: postgres
   namespace: order-service
 spec:
+  clusterIP: None
   selector:
     app: postgres
   ports:

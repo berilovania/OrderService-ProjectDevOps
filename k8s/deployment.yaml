@@ -15,6 +15,9 @@ spec:
       labels:
         app: order-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       imagePullSecrets:
         - name: ghcr-secret
       initContainers:
@@ -34,6 +37,9 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
       containers:
         - name: order-service
           image: ghcr.io/__GITHUB_USER__/__IMAGE_NAME__:latest
@@ -61,6 +67,12 @@ spec:
                   key: POSTGRES_DB
             - name: DATA_RETENTION_HOURS
               value: "24"
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: API_KEY
+                  optional: true
           resources:
             requests:
               cpu: 50m
@@ -68,6 +80,12 @@ spec:
             limits:
               cpu: 300m
               memory: 192Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           livenessProbe:
             httpGet:
               path: /health

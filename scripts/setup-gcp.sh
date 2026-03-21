@@ -80,6 +80,8 @@ echo "  postgres:16-alpine cached."
 echo "==> Applying Kubernetes manifests..."
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/postgres-pvc.yaml
+# Migrate from Deployment to StatefulSet (one-time, safe to repeat)
+kubectl delete deployment postgres -n order-service --ignore-not-found
 kubectl apply -f k8s/postgres-deployment.yaml
 kubectl apply -f k8s/postgres-service.yaml
 kubectl apply -f k8s/service.yaml
