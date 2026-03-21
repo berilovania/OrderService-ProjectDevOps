@@ -117,6 +117,8 @@ def get_docs_html() -> str:
             display: flex; align-items: center; gap: 6px;
             font-size: 0.82em; font-weight: 500; color: var(--success);
             padding: 5px 10px; background: var(--success-bg); border-radius: 20px;
+            position: absolute; left: 50%; transform: translateX(-50%);
+            pointer-events: none;
         }
         .pulse-dot {
             width: 7px; height: 7px; border-radius: 50%;
@@ -135,6 +137,36 @@ def get_docs_html() -> str:
         .icon-btn:hover {
             background: var(--bg-subtle); border-color: var(--border-strong);
             transform: scale(1.08);
+        }
+
+        /* ── Lock / API Key ──────────────────────── */
+        .lock-wrapper {
+            position: relative;
+            margin-left: 4px;
+        }
+        .lock-popover {
+            display: none;
+            position: absolute; top: calc(100% + 4px); right: 0;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow-lg);
+            padding: 14px 16px; min-width: 240px; z-index: 300;
+        }
+        .lock-wrapper.open .lock-popover { display: block; }
+        .lock-label {
+            font-size: 0.8em; font-weight: 600; color: var(--text-muted);
+            margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .lock-input {
+            width: 100%; padding: 7px 10px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-subtle); color: var(--text);
+            font-size: 0.88em; font-family: inherit;
+            transition: border-color var(--transition);
+            margin-bottom: 8px; display: block;
+        }
+        .lock-input:focus { outline: none; border-color: var(--primary); }
+        .lock-actions {
+            display: flex; gap: 6px; justify-content: flex-end;
         }
 
         /* ── Swagger container ──────────────────── */
@@ -341,6 +373,12 @@ def get_docs_html() -> str:
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content p,
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content label { color: var(--text) !important; }
 
+        /* Auth container text visibility */
+        [data-theme="dark"] .swagger-ui .auth-container h4,
+        [data-theme="dark"] .swagger-ui .auth-container code,
+        [data-theme="dark"] .swagger-ui .auth-container .wrapper p,
+        [data-theme="dark"] .swagger-ui .auth-container { color: var(--text) !important; }
+
         /* Buttons in dark */
         [data-theme="dark"] .swagger-ui .btn { color: var(--text) !important; border-color: var(--border) !important; background: var(--surface) !important; }
         [data-theme="dark"] .swagger-ui .btn.execute { color: #fff !important; background: var(--primary) !important; border-color: var(--primary) !important; }
@@ -454,6 +492,7 @@ def get_docs_html() -> str:
         @media (max-width: 768px) {
             nav { padding: 0 16px; }
             #swagger-ui { padding: 16px 12px 40px; }
+            .nav-status { display: none !important; }
         }
     </style>
 </head>
@@ -464,12 +503,11 @@ def get_docs_html() -> str:
         <div class="nav-logo">📦</div>
         Order Service
     </a>
+    <div class="nav-status">
+        <div class="pulse-dot"></div>
+        <span id="nav-status-text">Operacional</span>
+    </div>
     <div class="nav-links">
-        <div class="nav-status">
-            <div class="pulse-dot"></div>
-            <span id="nav-status-text">Operacional</span>
-        </div>
-        <div class="nav-divider"></div>
         <a class="nav-link" href="/" id="nav-home">Dashboard</a>
         <a class="nav-link active" href="/docs" id="nav-docs">Docs</a>
         <a class="nav-link" href="/metrics">Metrics</a>
@@ -491,6 +529,17 @@ def get_docs_html() -> str:
                 </button>
             </div>
         </div>
+        <div class="lock-wrapper" id="lock-wrapper">
+            <button class="icon-btn" id="lock-btn" title="API Key" onclick="toggleLockMenu()">🔓</button>
+            <div class="lock-popover" id="lock-popover">
+                <p class="lock-label" id="lock-label-text">API KEY</p>
+                <input class="lock-input" type="password" id="api-key-input" autocomplete="off" />
+                <div class="lock-actions">
+                    <button class="btn btn-ghost" style="font-size:0.82em;padding:5px 12px;" onclick="clearApiKey()" id="lock-clear-btn">Limpar</button>
+                    <button class="btn btn-primary" style="font-size:0.82em;padding:5px 12px;" onclick="saveApiKey()" id="lock-save-btn">Salvar</button>
+                </div>
+            </div>
+        </div>
         <button class="icon-btn" id="theme-btn" title="Tema / Theme" onclick="toggleTheme()">🌙</button>
     </div>
 </nav>
@@ -507,11 +556,35 @@ def get_docs_html() -> str:
             'nav.home':        'Dashboard',
             'nav.docs':        'Docs',
             'nav.operational': 'Operacional',
+            'lock.placeholder': 'Insira a API key…',
+            'lock.save.btn':   'Salvar',
+            'lock.clear.btn':  'Limpar',
+            'toast.auth.saved':   'API key salva.',
+            'toast.auth.cleared': 'API key removida.',
+            'swagger.authorize':  'Autorizar',
+            'swagger.tryitout':   'Testar',
+            'swagger.execute':    'Executar',
+            'swagger.clear':      'Limpar',
+            'swagger.cancel':     'Cancelar',
+            'swagger.close':      'Fechar',
+            'swagger.logout':     'Sair',
         },
         en: {
             'nav.home':        'Dashboard',
             'nav.docs':        'Docs',
             'nav.operational': 'Operational',
+            'lock.placeholder': 'Enter API key…',
+            'lock.save.btn':   'Save',
+            'lock.clear.btn':  'Clear',
+            'toast.auth.saved':   'API key saved.',
+            'toast.auth.cleared': 'API key removed.',
+            'swagger.authorize':  'Authorize',
+            'swagger.tryitout':   'Try it out',
+            'swagger.execute':    'Execute',
+            'swagger.clear':      'Clear',
+            'swagger.cancel':     'Cancel',
+            'swagger.close':      'Close',
+            'swagger.logout':     'Logout',
         },
     };
 
@@ -533,6 +606,13 @@ def get_docs_html() -> str:
         if (label) label.textContent = lang === 'pt' ? 'PT' : 'EN';
         document.getElementById('check-pt').textContent = lang === 'pt' ? '✓' : '';
         document.getElementById('check-en').textContent = lang === 'en' ? '✓' : '';
+        // Update lock popover
+        const lockInput = document.getElementById('api-key-input');
+        if (lockInput) lockInput.placeholder = t('lock.placeholder');
+        const saveBtn = document.getElementById('lock-save-btn');
+        if (saveBtn) saveBtn.textContent = t('lock.save.btn');
+        const clearBtn = document.getElementById('lock-clear-btn');
+        if (clearBtn) clearBtn.textContent = t('lock.clear.btn');
     }
 
     function toggleLangMenu() {
@@ -545,7 +625,51 @@ def get_docs_html() -> str:
     document.addEventListener('click', (e) => {
         const sel = document.getElementById('lang-selector');
         if (sel && !sel.contains(e.target)) sel.classList.remove('open');
+        const lw = document.getElementById('lock-wrapper');
+        if (lw && !lw.contains(e.target)) lw.classList.remove('open');
     });
+
+    // ── Lock / API Key ─────────────────────
+    function updateLockBtn() {
+        const key = localStorage.getItem('apiKey');
+        const btn = document.getElementById('lock-btn');
+        if (btn) btn.textContent = key ? '🔐' : '🔓';
+    }
+
+    function toggleLockMenu() {
+        const wrapper = document.getElementById('lock-wrapper');
+        if (!wrapper) return;
+        const isOpen = wrapper.classList.contains('open');
+        if (!isOpen) {
+            const key = localStorage.getItem('apiKey');
+            const input = document.getElementById('api-key-input');
+            if (input) {
+                input.value = key || '';
+                input.placeholder = t('lock.placeholder');
+            }
+        }
+        wrapper.classList.toggle('open');
+    }
+
+    function saveApiKey() {
+        const input = document.getElementById('api-key-input');
+        const key = input ? input.value.trim() : '';
+        if (key) {
+            localStorage.setItem('apiKey', key);
+        } else {
+            localStorage.removeItem('apiKey');
+        }
+        updateLockBtn();
+        document.getElementById('lock-wrapper')?.classList.remove('open');
+    }
+
+    function clearApiKey() {
+        localStorage.removeItem('apiKey');
+        const input = document.getElementById('api-key-input');
+        if (input) input.value = '';
+        updateLockBtn();
+        document.getElementById('lock-wrapper')?.classList.remove('open');
+    }
 
     // ── Theme ──────────────────────────────
     function applyTheme(theme) {
@@ -560,11 +684,13 @@ def get_docs_html() -> str:
     window.addEventListener('storage', e => {
         if (e.key === 'theme' && e.newValue) applyTheme(e.newValue);
         if (e.key === 'lang'  && e.newValue) applyLang(e.newValue);
+        if (e.key === 'apiKey') updateLockBtn();
     });
 
     // ── Init ───────────────────────────────
     applyTheme(currentTheme);
     applyLang(currentLang);
+    updateLockBtn();
     requestAnimationFrame(() => document.documentElement.classList.remove('no-trans'));
 
     // ── Swagger UI ─────────────────────────
@@ -573,20 +699,45 @@ def get_docs_html() -> str:
         dom_id:  '#swagger-ui',
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
         layout:  'BaseLayout',
-        deepLinking:           true,
-        docExpansion:          'none',
+        deepLinking:              true,
+        docExpansion:             'none',
         defaultModelsExpandDepth: -1,
-        displayRequestDuration: true,
-        defaultModelRendering: 'model',
+        displayRequestDuration:   true,
+        defaultModelRendering:    'model',
+        persistAuthorization:     true,
+        requestInterceptor: (request) => {
+            const key = localStorage.getItem('apiKey');
+            if (key) request.headers['X-API-Key'] = key;
+            return request;
+        },
     });
 
-    // Hide the "default" tag header
+    // Hide the "default" tag header + translate Swagger UI text
+    const SWAGGER_TRANSLATIONS = {
+        'Authorize': 'swagger.authorize',
+        'Try it out': 'swagger.tryitout',
+        'Execute': 'swagger.execute',
+        'Clear': 'swagger.clear',
+        'Cancel': 'swagger.cancel',
+        'Close': 'swagger.close',
+        'Logout': 'swagger.logout',
+    };
+    function translateSwaggerUI() {
+        if (currentLang !== 'pt') return;
+        document.querySelectorAll('.swagger-ui button, .swagger-ui .btn').forEach(btn => {
+            const txt = btn.textContent.trim();
+            const key = SWAGGER_TRANSLATIONS[txt];
+            if (key) btn.textContent = t(key);
+        });
+    }
+
     const observer = new MutationObserver(() => {
         document.querySelectorAll('.opblock-tag').forEach(tag => {
             if (tag.getAttribute('data-tag') === 'default') {
                 tag.style.display = 'none';
             }
         });
+        translateSwaggerUI();
     });
     observer.observe(document.getElementById('swagger-ui'), { childList: true, subtree: true });
 </script>

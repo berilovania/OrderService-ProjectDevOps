@@ -58,7 +58,7 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │   │                │                     │   │                   │
 │   │   │                ▼                     │   │                   │
 │   │   │   ┌────────────────────────────┐     │   │                   │
-│   │   │   │   PostgreSQL 16 (StatefulSet)│    │   │                   │
+│   │   │   │   PostgreSQL 16 (Stateful) │     │   │                   │
 │   │   │   │   PVC 1Gi persistente      │     │   │                   │
 │   │   │   │   porta 5432 (Headless)    │     │   │                   │
 │   │   │   │                            │     │   │                   │

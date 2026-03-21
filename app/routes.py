@@ -10,7 +10,9 @@ from .models import Order, OrderCreate, OrderStatus, StatusUpdate
 router = APIRouter()
 
 
-@router.post("/orders", response_model=Order, status_code=201, dependencies=[Depends(require_api_key)])
+@router.post("/orders", response_model=Order, status_code=201, dependencies=[Depends(require_api_key)],
+             summary="Criar pedido (Create order)",
+             description="Cria um novo pedido no sistema (Creates a new order)")
 async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)):
     order = Order(**payload.model_dump())
     row = OrderTable(
@@ -26,7 +28,9 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
     return order
 
 
-@router.get("/orders", response_model=list[Order])
+@router.get("/orders", response_model=list[Order],
+            summary="Listar pedidos (List orders)",
+            description="Retorna todos os pedidos com paginação (Returns all orders with pagination)")
 async def list_orders(
     skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=1000),
@@ -39,7 +43,9 @@ async def list_orders(
     return [_row_to_order(r) for r in rows]
 
 
-@router.get("/orders/{order_id}", response_model=Order)
+@router.get("/orders/{order_id}", response_model=Order,
+            summary="Buscar pedido (Get order)",
+            description="Busca um pedido pelo ID (Gets an order by ID)")
 async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(OrderTable, order_id)
     if row is None:
@@ -47,7 +53,9 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
     return _row_to_order(row)
 
 
-@router.patch("/orders/{order_id}/status", response_model=Order, dependencies=[Depends(require_api_key)])
+@router.patch("/orders/{order_id}/status", response_model=Order, dependencies=[Depends(require_api_key)],
+              summary="Atualizar status (Update status)",
+              description="Atualiza o status de um pedido (Updates an order status)")
 async def update_order_status(
     order_id: str, payload: StatusUpdate, db: AsyncSession = Depends(get_db)
 ):
@@ -62,7 +70,9 @@ async def update_order_status(
     return _row_to_order(row)
 
 
-@router.delete("/orders/{order_id}", response_model=Order, dependencies=[Depends(require_api_key)])
+@router.delete("/orders/{order_id}", response_model=Order, dependencies=[Depends(require_api_key)],
+               summary="Cancelar pedido (Cancel order)",
+               description="Cancela um pedido existente (Cancels an existing order)")
 async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
     row = await db.get(OrderTable, order_id)
     if row is None:
