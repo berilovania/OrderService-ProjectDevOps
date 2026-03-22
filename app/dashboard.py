@@ -960,9 +960,17 @@ function smartRender(orders) {
 // ── Load ──────────────────────────────────
 async function loadOrders() {
     try {
-        const res = await fetch(`${BASE}/orders?limit=1000`);
-        if (!res.ok) return;
-        smartRender(await res.json());
+        const pageSize = 1000;
+        let all = [], skip = 0;
+        while (true) {
+            const res = await fetch(`${BASE}/orders?limit=${pageSize}&skip=${skip}`);
+            if (!res.ok) return;
+            const page = await res.json();
+            all = all.concat(page);
+            if (page.length < pageSize) break;
+            skip += pageSize;
+        }
+        smartRender(all);
     } catch { /* silent */ }
 }
 

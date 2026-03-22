@@ -361,17 +361,149 @@ def get_docs_html() -> str:
             border-color: var(--border) !important;
         }
 
-        /* Auth modal */
+        /* ── Authorize Modal ────────────────────── */
+        .swagger-ui .dialog-ux .backdrop-ux {
+            background: rgba(0,0,0,0.45) !important;
+            backdrop-filter: blur(3px) !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux {
+            background: var(--surface) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius-lg) !important;
+            box-shadow: var(--shadow-lg) !important;
+            max-width: 500px !important;
+            width: 90vw !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-header {
+            background: linear-gradient(135deg, var(--primary), #8b5cf6) !important;
+            padding: 18px 22px !important;
+            border-bottom: none !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-header h3 {
+            color: #fff !important;
+            font-family: inherit !important;
+            font-size: 1.05em !important;
+            font-weight: 700 !important;
+            margin: 0 !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-header .close-modal {
+            background: rgba(255,255,255,0.2) !important;
+            border: none !important;
+            border-radius: var(--radius-sm) !important;
+            cursor: pointer !important;
+            padding: 4px 8px !important;
+            transition: background 0.15s !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-header .close-modal:hover { background: rgba(255,255,255,0.35) !important; }
+        .swagger-ui .dialog-ux .modal-ux-header .close-modal svg { fill: #fff !important; }
+        .swagger-ui .dialog-ux .modal-ux-content {
+            padding: 22px !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content .auth-container {
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius) !important;
+            padding: 16px !important;
+            margin-bottom: 12px !important;
+            background: var(--bg-subtle) !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content h4 {
+            font-family: inherit !important;
+            font-size: 0.82em !important;
+            font-weight: 700 !important;
+            color: var(--primary) !important;
+            margin-bottom: 10px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content p {
+            font-size: 0.85em !important;
+            color: var(--text-secondary) !important;
+            margin-bottom: 8px !important;
+            font-family: inherit !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content code {
+            background: var(--primary-light) !important;
+            color: var(--primary) !important;
+            border-radius: 4px !important;
+            padding: 1px 5px !important;
+            font-size: 0.88em !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content label {
+            font-size: 0.8em !important;
+            font-weight: 600 !important;
+            color: var(--text-muted) !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.4px !important;
+            margin-bottom: 6px !important;
+            display: block !important;
+            font-family: inherit !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content input[type=text],
+        .swagger-ui .dialog-ux .modal-ux-content input[type=password] {
+            width: 100% !important;
+            padding: 9px 12px !important;
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius-sm) !important;
+            background: var(--surface) !important;
+            color: var(--text) !important;
+            font-size: 0.88em !important;
+            font-family: 'SF Mono','Fira Code',monospace !important;
+            transition: border-color 0.2s, box-shadow 0.2s !important;
+            box-sizing: border-box !important;
+            margin-top: 4px !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content input:focus {
+            outline: none !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 0 0 3px var(--primary-muted) !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content .btn-done,
+        .swagger-ui .dialog-ux .modal-ux-content .btn.authorize {
+            background: var(--primary) !important;
+            border-color: var(--primary) !important;
+            color: #fff !important;
+            border-radius: var(--radius-sm) !important;
+            font-family: inherit !important;
+            font-weight: 600 !important;
+            padding: 8px 18px !important;
+            transition: background 0.15s !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content .btn-done:hover,
+        .swagger-ui .dialog-ux .modal-ux-content .btn.authorize:hover {
+            background: var(--primary-dark) !important;
+            border-color: var(--primary-dark) !important;
+        }
+        .swagger-ui .dialog-ux .modal-ux-content .btn.btn-done { background: var(--primary) !important; }
+        .swagger-ui .dialog-ux .modal-ux-content .error { color: var(--danger) !important; font-size: 0.85em !important; }
+
+        /* Auth modal — dark */
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux {
             background: var(--surface) !important;
             border-color: var(--border) !important;
         }
-        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-header {
+        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content .auth-container {
+            background: var(--bg) !important;
             border-color: var(--border) !important;
         }
+        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content h4 { color: var(--primary) !important; }
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-header h3,
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content p,
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content label { color: var(--text) !important; }
+        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content input[type=text],
+        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content input[type=password] {
+            background: var(--bg-subtle) !important;
+            border-color: var(--border) !important;
+            color: var(--text) !important;
+        }
+        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content code {
+            background: var(--primary-muted) !important;
+            color: var(--primary) !important;
+        }
 
         /* Auth container text visibility */
         [data-theme="dark"] .swagger-ui .auth-container h4,
@@ -613,6 +745,8 @@ def get_docs_html() -> str:
         if (saveBtn) saveBtn.textContent = t('lock.save.btn');
         const clearBtn = document.getElementById('lock-clear-btn');
         if (clearBtn) clearBtn.textContent = t('lock.clear.btn');
+        // Re-translate Swagger UI buttons when language changes
+        translateSwaggerUI();
     }
 
     function toggleLangMenu() {
@@ -661,6 +795,8 @@ def get_docs_html() -> str:
         }
         updateLockBtn();
         document.getElementById('lock-wrapper')?.classList.remove('open');
+        // Sync with Swagger UI internal auth state
+        if (window._swaggerUi) window._swaggerUi.preauthorizeApiKey('X-API-Key', key || '');
     }
 
     function clearApiKey() {
@@ -669,6 +805,8 @@ def get_docs_html() -> str:
         if (input) input.value = '';
         updateLockBtn();
         document.getElementById('lock-wrapper')?.classList.remove('open');
+        // Clear Swagger UI internal auth state
+        if (window._swaggerUi) window._swaggerUi.preauthorizeApiKey('X-API-Key', '');
     }
 
     // ── Theme ──────────────────────────────
@@ -694,7 +832,7 @@ def get_docs_html() -> str:
     requestAnimationFrame(() => document.documentElement.classList.remove('no-trans'));
 
     // ── Swagger UI ─────────────────────────
-    SwaggerUIBundle({
+    window._swaggerUi = SwaggerUIBundle({
         url:     '/openapi.json',
         dom_id:  '#swagger-ui',
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
@@ -710,9 +848,15 @@ def get_docs_html() -> str:
             if (key) request.headers['X-API-Key'] = key;
             return request;
         },
+        onComplete: () => {
+            // Pre-authorize with stored key so padlocks show as locked
+            const key = localStorage.getItem('apiKey');
+            if (key) window._swaggerUi.preauthorizeApiKey('X-API-Key', key);
+        },
     });
 
     // Hide the "default" tag header + translate Swagger UI text
+    // Keys are canonical English text; value is i18n key
     const SWAGGER_TRANSLATIONS = {
         'Authorize': 'swagger.authorize',
         'Try it out': 'swagger.tryitout',
@@ -723,11 +867,15 @@ def get_docs_html() -> str:
         'Logout': 'swagger.logout',
     };
     function translateSwaggerUI() {
-        if (currentLang !== 'pt') return;
         document.querySelectorAll('.swagger-ui button, .swagger-ui .btn').forEach(btn => {
             const txt = btn.textContent.trim();
-            const key = SWAGGER_TRANSLATIONS[txt];
-            if (key) btn.textContent = t(key);
+            // Tag the button with its i18n key on first encounter (match English text)
+            if (!btn.dataset.swaggerKey && SWAGGER_TRANSLATIONS[txt]) {
+                btn.dataset.swaggerKey = SWAGGER_TRANSLATIONS[txt];
+            }
+            if (btn.dataset.swaggerKey) {
+                btn.textContent = t(btn.dataset.swaggerKey);
+            }
         });
     }
 
