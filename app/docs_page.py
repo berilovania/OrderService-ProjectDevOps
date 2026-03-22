@@ -874,7 +874,8 @@ def get_docs_html() -> str:
                 btn.dataset.swaggerKey = SWAGGER_TRANSLATIONS[txt];
             }
             if (btn.dataset.swaggerKey) {
-                btn.textContent = t(btn.dataset.swaggerKey);
+                const translated = t(btn.dataset.swaggerKey);
+                if (btn.textContent !== translated) btn.textContent = translated;
             }
         });
     }
