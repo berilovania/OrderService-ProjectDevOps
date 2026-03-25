@@ -81,8 +81,8 @@ echo "==> Replacing placeholders in deployment manifest..."
 sed -i "s|__GITHUB_USER__|${GITHUB_USER}|g" k8s/deployment.yaml
 sed -i "s|__IMAGE_NAME__|${IMAGE_NAME}|g" k8s/deployment.yaml
 
-DOMAIN="${4:-__DOMAIN__}"
-ACME_EMAIL="${5:-__ACME_EMAIL__}"
+DOMAIN="${4:?Error: DOMAIN argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
+ACME_EMAIL="${5:?Error: ACME_EMAIL argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
 sed -i "s|__DOMAIN__|${DOMAIN}|g" k8s/ingress.yaml
 sed -i "s|__ACME_EMAIL__|${ACME_EMAIL}|g" k8s/clusterissuer.yaml
 
