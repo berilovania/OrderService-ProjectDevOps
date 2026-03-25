@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ============================================================
 # setup-gcp.sh — Setup k3s + deploy order-service on GCP (e2-small)
-# Usage: ssh into GCP VM as user 'gcp', then run: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD]
+# Usage: ssh into GCP VM as user 'gcp', then run: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] [DOMAIN] [ACME_EMAIL]
 # ============================================================
 
 GITHUB_USER="${1:?Usage: bash setup-gcp.sh <GITHUB_USER>}"
@@ -36,6 +36,14 @@ done
 
 echo "==> Waiting for node to be Ready..."
 kubectl wait --for=condition=Ready node --all --timeout=120s
+
+echo "==> Installing cert-manager..."
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml
+
+echo "==> Waiting for cert-manager to be ready..."
+kubectl rollout status deployment/cert-manager -n cert-manager --timeout=120s
+kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
+kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=120s
 
 echo "==> Creating GHCR pull secret..."
 echo "Enter your GitHub Personal Access Token (with read:packages scope):"
@@ -73,6 +81,11 @@ echo "==> Replacing placeholders in deployment manifest..."
 sed -i "s|__GITHUB_USER__|${GITHUB_USER}|g" k8s/deployment.yaml
 sed -i "s|__IMAGE_NAME__|${IMAGE_NAME}|g" k8s/deployment.yaml
 
+DOMAIN="${4:-__DOMAIN__}"
+ACME_EMAIL="${5:-__ACME_EMAIL__}"
+sed -i "s|__DOMAIN__|${DOMAIN}|g" k8s/ingress.yaml
+sed -i "s|__ACME_EMAIL__|${ACME_EMAIL}|g" k8s/clusterissuer.yaml
+
 echo "==> Pre-pulling images to avoid memory spike during pod startup..."
 sudo k3s crictl pull postgres:16-alpine
 echo "  postgres:16-alpine cached."
@@ -85,6 +98,12 @@ kubectl delete deployment postgres -n order-service --ignore-not-found
 kubectl apply -f k8s/postgres-deployment.yaml
 kubectl apply -f k8s/postgres-service.yaml
 kubectl apply -f k8s/service.yaml
+
+echo "==> Applying cert-manager ClusterIssuer..."
+kubectl apply -f k8s/clusterissuer.yaml
+
+echo "==> Applying Ingress..."
+kubectl apply -f k8s/ingress.yaml
 
 echo "==> Waiting for PostgreSQL pod to be Running..."
 for i in $(seq 1 36); do
@@ -109,5 +128,9 @@ done
 
 echo ""
 echo "==> Setup complete!"
-echo "    Test: curl http://localhost:30080/health"
-echo "    Swagger: http://<GCP_EXTERNAL_IP>:30080/docs"
+echo "    Test (NodePort): curl http://localhost:30080/health"
+echo "    Test (HTTPS):    curl https://${DOMAIN}/health"
+echo "    Swagger:         https://${DOMAIN}/docs"
+echo ""
+echo "    NOTE: TLS cert may take 1-2 minutes to issue after DNS propagates."
+echo "    Check cert status: kubectl describe certificate order-service-tls -n order-service"
