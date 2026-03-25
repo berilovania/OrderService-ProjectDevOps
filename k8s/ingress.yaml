@@ -11,18 +11,12 @@ metadata:
         deny all;
         return 403;
       }
-    # --- TLS with cert-manager ---
-    # 1. Install cert-manager: kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-    # 2. Create a ClusterIssuer for Let's Encrypt
-    # 3. Uncomment the annotation below:
-    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  # k3s ships with Traefik by default. To use this Ingress with NGINX:
-  # 1. Install NGINX Ingress Controller: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.0/deploy/static/provider/cloud/deploy.yaml
-  # 2. Or switch the ingressClassName below to "traefik" to use k3s built-in Traefik
   ingressClassName: nginx
   rules:
-    - http:
+    - host: __DOMAIN__
+      http:
         paths:
           - path: /
             pathType: Prefix
@@ -31,9 +25,7 @@ spec:
                 name: order-service
                 port:
                   number: 8000
-  # --- TLS termination ---
-  # Uncomment after configuring cert-manager and a ClusterIssuer:
-  # tls:
-  #   - hosts:
-  #       - your-domain.com
-  #     secretName: order-service-tls
+  tls:
+    - hosts:
+        - __DOMAIN__
+      secretName: order-service-tls
