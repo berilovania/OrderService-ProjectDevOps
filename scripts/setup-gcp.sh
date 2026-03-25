@@ -37,6 +37,12 @@ done
 echo "==> Waiting for node to be Ready..."
 kubectl wait --for=condition=Ready node --all --timeout=120s
 
+echo "==> Installing NGINX Ingress Controller..."
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.0/deploy/static/provider/cloud/deploy.yaml
+
+echo "==> Waiting for NGINX Ingress Controller to be ready..."
+kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=120s
+
 echo "==> Installing cert-manager..."
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml
 
@@ -44,6 +50,9 @@ echo "==> Waiting for cert-manager to be ready..."
 kubectl rollout status deployment/cert-manager -n cert-manager --timeout=120s
 kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
 kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=120s
+
+echo "==> Waiting for cert-manager webhook to register..."
+sleep 15
 
 echo "==> Creating GHCR pull secret..."
 echo "Enter your GitHub Personal Access Token (with read:packages scope):"
