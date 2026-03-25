@@ -40,6 +40,9 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
       containers:
         - name: order-service
           image: ghcr.io/__GITHUB_USER__/__IMAGE_NAME__:latest
@@ -86,6 +89,11 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: var-tmp-dir
+              mountPath: /var/tmp
           livenessProbe:
             httpGet:
               path: /health
@@ -98,7 +106,12 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 6
+            failureThreshold: 20
             timeoutSeconds: 5
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+        - name: var-tmp-dir
+          emptyDir: {}

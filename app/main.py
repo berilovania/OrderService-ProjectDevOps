@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -36,6 +37,10 @@ async def lifespan(app: FastAPI):
     cleanup_task = asyncio.create_task(cleanup_old_orders())
     yield
     cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
     await engine.dispose()
 
 
@@ -93,7 +98,11 @@ API_KEY = os.getenv("API_KEY", "")
 @app.get("/metrics", include_in_schema=False)
 async def metrics_endpoint(request: Request):
     client_ip = request.client.host if request.client else ""
-    is_internal = client_ip in ("127.0.0.1", "::1") or client_ip.startswith(("10.", "172."))
+    try:
+        _ip = ipaddress.ip_address(client_ip)
+        is_internal = _ip.is_loopback or _ip.is_private
+    except ValueError:
+        is_internal = False
 
     api_key = request.headers.get("X-API-Key", "")
     has_valid_key = bool(API_KEY) and api_key == API_KEY
