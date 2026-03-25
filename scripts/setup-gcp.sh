@@ -6,9 +6,11 @@ set -euo pipefail
 # Usage: ssh into GCP VM as user 'gcp', then run: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] [DOMAIN] [ACME_EMAIL]
 # ============================================================
 
-GITHUB_USER="${1:?Usage: bash setup-gcp.sh <GITHUB_USER>}"
+GITHUB_USER="${1:?Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
 IMAGE_NAME="${2:-orderservice-projectdevops}"
 DB_PASSWORD="${3:-orderpass}"
+DOMAIN="${4:?Error: DOMAIN argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
+ACME_EMAIL="${5:?Error: ACME_EMAIL argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
 IMAGE="ghcr.io/${GITHUB_USER}/${IMAGE_NAME}:latest"
 
 echo "==> Updating system..."
@@ -42,6 +44,14 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 echo "==> Waiting for NGINX Ingress Controller to be ready..."
 kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=120s
+
+echo "==> Enabling NGINX snippet annotations..."
+kubectl patch configmap ingress-nginx-controller \
+  -n ingress-nginx \
+  --type merge \
+  -p '{"data":{"allow-snippet-annotations":"true"}}'
+kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
+kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=60s
 
 echo "==> Installing cert-manager..."
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml
@@ -90,8 +100,6 @@ echo "==> Replacing placeholders in deployment manifest..."
 sed -i "s|__GITHUB_USER__|${GITHUB_USER}|g" k8s/deployment.yaml
 sed -i "s|__IMAGE_NAME__|${IMAGE_NAME}|g" k8s/deployment.yaml
 
-DOMAIN="${4:?Error: DOMAIN argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
-ACME_EMAIL="${5:?Error: ACME_EMAIL argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
 sed -i "s|__DOMAIN__|${DOMAIN}|g" k8s/ingress.yaml
 sed -i "s|__ACME_EMAIL__|${ACME_EMAIL}|g" k8s/clusterissuer.yaml
 
