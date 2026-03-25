@@ -15,7 +15,7 @@ A aplicação — uma API REST de gerenciamento de pedidos construída com FastA
 - **Deploy real em nuvem** — cluster Kubernetes rodando em VM GCP Compute Engine
 - **Boas práticas de containerização** — imagem Docker otimizada com multi-stage build
 - **Observabilidade** — métricas Prometheus, health checks e probes de liveness/readiness
-- **Segurança em camadas** — autenticação por API Key, container não-root, securityContext, scan de vulnerabilidades
+- **Segurança em camadas** — container não-root, securityContext, scan de vulnerabilidades Trivy
 
 ---
 
@@ -146,7 +146,7 @@ Constrói e verifica a segurança da imagem antes de publicá-la:
 Aplica a nova versão no cluster Kubernetes:
 - Copia os manifests `k8s/` via SCP para a VM GCP
 - Conecta na VM GCP via SSH e executa:
-  - Criação/atualização do Secret (PostgreSQL + API Key, direto no cluster, sem gravar em disco)
+  - Criação/atualização do Secret (credenciais PostgreSQL, direto no cluster, sem gravar em disco)
   - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`)
   - `kubectl apply` em todos os manifests com validação habilitada
   - Aguarda o StatefulSet do PostgreSQL ficar pronto (timeout: 180s)
@@ -161,7 +161,6 @@ Aplica a nova versão no cluster Kubernetes:
 | `GCP_HOST` | External IP da VM GCP |
 | `GCP_SSH_KEY` | Chave privada SSH |
 | `DB_PASSWORD` | Senha do PostgreSQL para o cluster |
-| `API_KEY` | Chave de autenticação para endpoints de escrita (opcional — se vazio, auth desabilitada) |
 
 > O `GITHUB_TOKEN` é provido automaticamente pelo GitHub Actions com permissões de `contents: read` e `packages: write`.
 
@@ -318,26 +317,13 @@ Os testes são executados automaticamente no job `test` com um container Postgre
 
 O projeto aplica segurança em múltiplas camadas:
 
-### Autenticação por API Key
+### API pública
 
-Endpoints de escrita (`POST`, `PATCH`, `DELETE`) são protegidos por autenticação via header `X-API-Key`. Endpoints de leitura (`GET`) permanecem públicos.
-
-```bash
-# Sem autenticação — rejeitado (401)
-curl -X POST http://localhost:8000/orders -H "Content-Type: application/json" \
-  -d '{"customer": "Test", "items": ["item1"], "total": 99.90}'
-
-# Com API Key — aceito (201)
-curl -X POST http://localhost:8000/orders -H "Content-Type: application/json" \
-  -H "X-API-Key: sua-chave-aqui" \
-  -d '{"customer": "Test", "items": ["item1"], "total": 99.90}'
-```
-
-> Se a variável de ambiente `API_KEY` estiver vazia ou não definida, a autenticação é desabilitada automaticamente (modo desenvolvimento).
+Todos os endpoints (`POST`, `PATCH`, `DELETE`, `GET`) são públicos — sem autenticação por API key.
 
 ### Métricas protegidas
 
-O endpoint `/metrics` aceita requisições apenas de IPs internos (`127.0.0.1`, redes `10.*`/`172.*`) ou com `X-API-Key` válida. Requisições externas sem chave recebem `403 Forbidden`.
+O endpoint `/metrics` aceita requisições apenas de IPs internos (`127.0.0.1`, redes RFC1918). Requisições externas recebem `403 Forbidden`.
 
 ### Container não-root
 
@@ -462,7 +448,6 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── models.py                   # Schemas Pydantic (validação de entrada/saída)
 │   ├── database.py                 # Engine async SQLAlchemy + gerenciamento de sessão
 │   ├── db_models.py                # Modelo ORM mapeando a tabela orders
-│   ├── auth.py                     # Autenticação por API Key (header X-API-Key)
 │   ├── metrics.py                  # Configuração do Prometheus
 │   ├── dashboard.py                # HTML do dashboard interativo (/)
 │   ├── docs_page.py                # HTML do Swagger UI customizado (/docs)
@@ -591,7 +576,7 @@ Este projeto demonstra a implementação prática de um **pipeline DevOps comple
 - **Persistência de dados** — PostgreSQL com PersistentVolumeClaim, dados sobrevivem a reinícios
 - **Deploy em Cloud** — cluster k3s real rodando em VM GCP Compute Engine, acessível publicamente
 - **Observabilidade** — métricas Prometheus e health checks integrados desde o início
-- **Segurança em camadas** — autenticação por API Key, containers não-root, securityContext restritivo, proteção contra XSS, scan Trivy em cada build, secrets sem hardcoding
+- **Segurança em camadas** — containers não-root, securityContext restritivo, proteção contra XSS, scan Trivy em cada build, secrets sem hardcoding
 
 O objetivo é mostrar domínio sobre o ciclo completo de entrega de software, desde o commit até a aplicação rodando em produção, com automação, reprodutibilidade e boas práticas de engenharia.
 

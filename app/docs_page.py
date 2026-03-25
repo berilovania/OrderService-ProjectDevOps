@@ -6,7 +6,7 @@ def get_docs_html() -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docs — Order Service</title>
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light');document.documentElement.classList.add('no-trans');</script>
+    <script>document.documentElement.setAttribute('data-theme','dark');document.documentElement.classList.add('no-trans');</script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
     <style>
         html.no-trans * { transition: none !important; }
@@ -139,36 +139,6 @@ def get_docs_html() -> str:
             transform: scale(1.08);
         }
 
-        /* ── Lock / API Key ──────────────────────── */
-        .lock-wrapper {
-            position: relative;
-            margin-left: 4px;
-        }
-        .lock-popover {
-            display: none;
-            position: absolute; top: calc(100% + 4px); right: 0;
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: var(--radius); box-shadow: var(--shadow-lg);
-            padding: 14px 16px; min-width: 240px; z-index: 300;
-        }
-        .lock-wrapper.open .lock-popover { display: block; }
-        .lock-label {
-            font-size: 0.8em; font-weight: 600; color: var(--text-muted);
-            margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .lock-input {
-            width: 100%; padding: 7px 10px;
-            border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-subtle); color: var(--text);
-            font-size: 0.88em; font-family: inherit;
-            transition: border-color var(--transition);
-            margin-bottom: 8px; display: block;
-        }
-        .lock-input:focus { outline: none; border-color: var(--primary); }
-        .lock-actions {
-            display: flex; gap: 6px; justify-content: flex-end;
-        }
-
         /* ── Swagger container ──────────────────── */
         #swagger-ui {
             max-width: 1080px;
@@ -259,12 +229,6 @@ def get_docs_html() -> str:
         .swagger-ui .btn.cancel {
             border-radius: var(--radius-sm) !important;
         }
-        .swagger-ui .btn.authorize {
-            border-radius: var(--radius-sm) !important;
-            color: var(--primary) !important;
-            border-color: var(--primary) !important;
-        }
-
         /* Models section */
         .swagger-ui section.models {
             border-radius: var(--radius) !important;
@@ -404,13 +368,6 @@ def get_docs_html() -> str:
         .swagger-ui .dialog-ux .modal-ux-content {
             padding: 22px !important;
         }
-        .swagger-ui .dialog-ux .modal-ux-content .auth-container {
-            border: 1px solid var(--border) !important;
-            border-radius: var(--radius) !important;
-            padding: 16px !important;
-            margin-bottom: 12px !important;
-            background: var(--bg-subtle) !important;
-        }
         .swagger-ui .dialog-ux .modal-ux-content h4 {
             font-family: inherit !important;
             font-size: 0.82em !important;
@@ -462,8 +419,7 @@ def get_docs_html() -> str:
             border-color: var(--primary) !important;
             box-shadow: 0 0 0 3px var(--primary-muted) !important;
         }
-        .swagger-ui .dialog-ux .modal-ux-content .btn-done,
-        .swagger-ui .dialog-ux .modal-ux-content .btn.authorize {
+        .swagger-ui .dialog-ux .modal-ux-content .btn-done {
             background: var(--primary) !important;
             border-color: var(--primary) !important;
             color: #fff !important;
@@ -473,8 +429,7 @@ def get_docs_html() -> str:
             padding: 8px 18px !important;
             transition: background 0.15s !important;
         }
-        .swagger-ui .dialog-ux .modal-ux-content .btn-done:hover,
-        .swagger-ui .dialog-ux .modal-ux-content .btn.authorize:hover {
+        .swagger-ui .dialog-ux .modal-ux-content .btn-done:hover {
             background: var(--primary-dark) !important;
             border-color: var(--primary-dark) !important;
         }
@@ -484,10 +439,6 @@ def get_docs_html() -> str:
         /* Auth modal — dark */
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux {
             background: var(--surface) !important;
-            border-color: var(--border) !important;
-        }
-        [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content .auth-container {
-            background: var(--bg) !important;
             border-color: var(--border) !important;
         }
         [data-theme="dark"] .swagger-ui .dialog-ux .modal-ux-content h4 { color: var(--primary) !important; }
@@ -505,17 +456,9 @@ def get_docs_html() -> str:
             color: var(--primary) !important;
         }
 
-        /* Auth container text visibility */
-        [data-theme="dark"] .swagger-ui .auth-container h4,
-        [data-theme="dark"] .swagger-ui .auth-container code,
-        [data-theme="dark"] .swagger-ui .auth-container .wrapper p,
-        [data-theme="dark"] .swagger-ui .auth-container { color: var(--text) !important; }
-
         /* Buttons in dark */
         [data-theme="dark"] .swagger-ui .btn { color: var(--text) !important; border-color: var(--border) !important; background: var(--surface) !important; }
         [data-theme="dark"] .swagger-ui .btn.execute { color: #fff !important; background: var(--primary) !important; border-color: var(--primary) !important; }
-        [data-theme="dark"] .swagger-ui .btn.authorize { color: var(--primary) !important; border-color: var(--primary) !important; background: transparent !important; }
-
         /* Operation path text */
         [data-theme="dark"] .swagger-ui .opblock-summary-path { color: var(--text) !important; }
 
@@ -569,6 +512,85 @@ def get_docs_html() -> str:
 
         /* Loading */
         [data-theme="dark"] .swagger-ui .loading-container .loading::after { color: var(--text-muted) !important; }
+
+        /* ── Catch-all: force light text on remaining Swagger elements ── */
+        [data-theme="dark"] .swagger-ui,
+        [data-theme="dark"] .swagger-ui p,
+        [data-theme="dark"] .swagger-ui span,
+        [data-theme="dark"] .swagger-ui h1,
+        [data-theme="dark"] .swagger-ui h2,
+        [data-theme="dark"] .swagger-ui h3,
+        [data-theme="dark"] .swagger-ui h4,
+        [data-theme="dark"] .swagger-ui h5,
+        [data-theme="dark"] .swagger-ui small,
+        [data-theme="dark"] .swagger-ui td,
+        [data-theme="dark"] .swagger-ui th,
+        [data-theme="dark"] .swagger-ui li { color: var(--text) !important; }
+
+        /* Links */
+        [data-theme="dark"] .swagger-ui a { color: var(--primary) !important; }
+        [data-theme="dark"] .swagger-ui .info a { color: var(--primary) !important; }
+
+        /* SVG arrows & icons */
+        [data-theme="dark"] .swagger-ui svg:not(.model-toggle) { fill: var(--text) !important; }
+        [data-theme="dark"] .swagger-ui .expand-operation svg,
+        [data-theme="dark"] .swagger-ui .opblock-summary-control svg,
+        [data-theme="dark"] .swagger-ui .model-toggle svg,
+        [data-theme="dark"] .swagger-ui .arrow svg { fill: var(--text-secondary) !important; }
+
+        /* Try-out & generic buttons */
+        [data-theme="dark"] .swagger-ui .try-out__btn { color: var(--text) !important; border-color: var(--border) !important; }
+        [data-theme="dark"] .swagger-ui .btn-group select {
+            background: var(--bg-subtle) !important;
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+        }
+
+        /* Request URL + curl */
+        [data-theme="dark"] .swagger-ui .request-url pre {
+            background: var(--bg-subtle) !important;
+            color: var(--text) !important;
+        }
+        [data-theme="dark"] .swagger-ui .curl-command .copy-to-clipboard { background: var(--surface) !important; }
+
+        /* Download button */
+        [data-theme="dark"] .swagger-ui .download-contents { color: var(--primary) !important; }
+
+        /* Live response status */
+        [data-theme="dark"] .swagger-ui .live-responses-table .response-col_status { color: var(--text) !important; }
+
+        /* Response headers */
+        [data-theme="dark"] .swagger-ui .response-col_description .renderedMarkdown p { color: var(--text-secondary) !important; }
+
+        /* JSON Schema $ref links */
+        [data-theme="dark"] .swagger-ui .model .model-title { color: var(--primary) !important; }
+
+        /* JSON Schema 2020-12 elements */
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__title,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__attribute,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__attribute--primary,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__attribute--secondary,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__description,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12-keyword__name,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12-keyword,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12-keyword__value,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12-keyword__value--const,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__body,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__expand-deep-button,
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__property { color: var(--text) !important; }
+
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__title { color: var(--primary) !important; }
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12__attribute--primary { color: var(--info) !important; }
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12-keyword__name { color: var(--text-secondary) !important; }
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12-keyword__value { color: var(--success) !important; }
+
+        [data-theme="dark"] .swagger-ui .json-schema-2020-12 {
+            background: var(--bg-subtle) !important;
+            border-color: var(--border) !important;
+        }
+
+        /* Method badges keep white text */
+        [data-theme="dark"] .swagger-ui .opblock .opblock-summary-method { color: #fff !important; }
 
         /* ── Language selector ──────────────────── */
         .lang-selector {
@@ -661,18 +683,6 @@ def get_docs_html() -> str:
                 </button>
             </div>
         </div>
-        <div class="lock-wrapper" id="lock-wrapper">
-            <button class="icon-btn" id="lock-btn" title="API Key" onclick="toggleLockMenu()">🔓</button>
-            <div class="lock-popover" id="lock-popover">
-                <p class="lock-label" id="lock-label-text">API KEY</p>
-                <input class="lock-input" type="password" id="api-key-input" autocomplete="off" />
-                <div class="lock-actions">
-                    <button class="btn btn-ghost" style="font-size:0.82em;padding:5px 12px;" onclick="clearApiKey()" id="lock-clear-btn">Limpar</button>
-                    <button class="btn btn-primary" style="font-size:0.82em;padding:5px 12px;" onclick="saveApiKey()" id="lock-save-btn">Salvar</button>
-                </div>
-            </div>
-        </div>
-        <button class="icon-btn" id="theme-btn" title="Tema / Theme" onclick="toggleTheme()">🌙</button>
     </div>
 </nav>
 
@@ -688,40 +698,26 @@ def get_docs_html() -> str:
             'nav.home':        'Dashboard',
             'nav.docs':        'Docs',
             'nav.operational': 'Operacional',
-            'lock.placeholder': 'Insira a API key…',
-            'lock.save.btn':   'Salvar',
-            'lock.clear.btn':  'Limpar',
-            'toast.auth.saved':   'API key salva.',
-            'toast.auth.cleared': 'API key removida.',
-            'swagger.authorize':  'Autorizar',
             'swagger.tryitout':   'Testar',
             'swagger.execute':    'Executar',
             'swagger.clear':      'Limpar',
             'swagger.cancel':     'Cancelar',
             'swagger.close':      'Fechar',
-            'swagger.logout':     'Sair',
         },
         en: {
             'nav.home':        'Dashboard',
             'nav.docs':        'Docs',
             'nav.operational': 'Operational',
-            'lock.placeholder': 'Enter API key…',
-            'lock.save.btn':   'Save',
-            'lock.clear.btn':  'Clear',
-            'toast.auth.saved':   'API key saved.',
-            'toast.auth.cleared': 'API key removed.',
-            'swagger.authorize':  'Authorize',
             'swagger.tryitout':   'Try it out',
             'swagger.execute':    'Execute',
             'swagger.clear':      'Clear',
             'swagger.cancel':     'Cancel',
             'swagger.close':      'Close',
-            'swagger.logout':     'Logout',
         },
     };
 
     let currentLang  = localStorage.getItem('lang')  || 'pt';
-    let currentTheme = localStorage.getItem('theme') || 'light';
+    let currentTheme = 'dark';
 
     function t(key) { return DOCS_TR[currentLang][key] ?? key; }
 
@@ -738,13 +734,6 @@ def get_docs_html() -> str:
         if (label) label.textContent = lang === 'pt' ? 'PT' : 'EN';
         document.getElementById('check-pt').textContent = lang === 'pt' ? '✓' : '';
         document.getElementById('check-en').textContent = lang === 'en' ? '✓' : '';
-        // Update lock popover
-        const lockInput = document.getElementById('api-key-input');
-        if (lockInput) lockInput.placeholder = t('lock.placeholder');
-        const saveBtn = document.getElementById('lock-save-btn');
-        if (saveBtn) saveBtn.textContent = t('lock.save.btn');
-        const clearBtn = document.getElementById('lock-clear-btn');
-        if (clearBtn) clearBtn.textContent = t('lock.clear.btn');
         // Re-translate Swagger UI buttons when language changes
         translateSwaggerUI();
     }
@@ -759,76 +748,15 @@ def get_docs_html() -> str:
     document.addEventListener('click', (e) => {
         const sel = document.getElementById('lang-selector');
         if (sel && !sel.contains(e.target)) sel.classList.remove('open');
-        const lw = document.getElementById('lock-wrapper');
-        if (lw && !lw.contains(e.target)) lw.classList.remove('open');
     });
-
-    // ── Lock / API Key ─────────────────────
-    function updateLockBtn() {
-        const key = localStorage.getItem('apiKey');
-        const btn = document.getElementById('lock-btn');
-        if (btn) btn.textContent = key ? '🔐' : '🔓';
-    }
-
-    function toggleLockMenu() {
-        const wrapper = document.getElementById('lock-wrapper');
-        if (!wrapper) return;
-        const isOpen = wrapper.classList.contains('open');
-        if (!isOpen) {
-            const key = localStorage.getItem('apiKey');
-            const input = document.getElementById('api-key-input');
-            if (input) {
-                input.value = key || '';
-                input.placeholder = t('lock.placeholder');
-            }
-        }
-        wrapper.classList.toggle('open');
-    }
-
-    function saveApiKey() {
-        const input = document.getElementById('api-key-input');
-        const key = input ? input.value.trim() : '';
-        if (key) {
-            localStorage.setItem('apiKey', key);
-        } else {
-            localStorage.removeItem('apiKey');
-        }
-        updateLockBtn();
-        document.getElementById('lock-wrapper')?.classList.remove('open');
-        // Sync with Swagger UI internal auth state
-        if (window._swaggerUi) window._swaggerUi.preauthorizeApiKey('X-API-Key', key || '');
-    }
-
-    function clearApiKey() {
-        localStorage.removeItem('apiKey');
-        const input = document.getElementById('api-key-input');
-        if (input) input.value = '';
-        updateLockBtn();
-        document.getElementById('lock-wrapper')?.classList.remove('open');
-        // Clear Swagger UI internal auth state
-        if (window._swaggerUi) window._swaggerUi.preauthorizeApiKey('X-API-Key', '');
-    }
-
-    // ── Theme ──────────────────────────────
-    function applyTheme(theme) {
-        currentTheme = theme;
-        document.documentElement.setAttribute('data-theme', theme);
-        document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
-        localStorage.setItem('theme', theme);
-    }
-    function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
 
     // Cross-tab sync
     window.addEventListener('storage', e => {
-        if (e.key === 'theme' && e.newValue) applyTheme(e.newValue);
         if (e.key === 'lang'  && e.newValue) applyLang(e.newValue);
-        if (e.key === 'apiKey') updateLockBtn();
     });
 
     // ── Init ───────────────────────────────
-    applyTheme(currentTheme);
     applyLang(currentLang);
-    updateLockBtn();
     requestAnimationFrame(() => document.documentElement.classList.remove('no-trans'));
 
     // ── Swagger UI ─────────────────────────
@@ -838,33 +766,21 @@ def get_docs_html() -> str:
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
         layout:  'BaseLayout',
         deepLinking:              true,
-        docExpansion:             'none',
+        docExpansion:             'list',
         defaultModelsExpandDepth: -1,
         displayRequestDuration:   true,
         defaultModelRendering:    'model',
         persistAuthorization:     true,
-        requestInterceptor: (request) => {
-            const key = localStorage.getItem('apiKey');
-            if (key) request.headers['X-API-Key'] = key;
-            return request;
-        },
-        onComplete: () => {
-            // Pre-authorize with stored key so padlocks show as locked
-            const key = localStorage.getItem('apiKey');
-            if (key) window._swaggerUi.preauthorizeApiKey('X-API-Key', key);
-        },
     });
 
     // Hide the "default" tag header + translate Swagger UI text
     // Keys are canonical English text; value is i18n key
     const SWAGGER_TRANSLATIONS = {
-        'Authorize': 'swagger.authorize',
         'Try it out': 'swagger.tryitout',
         'Execute': 'swagger.execute',
         'Clear': 'swagger.clear',
         'Cancel': 'swagger.cancel',
         'Close': 'swagger.close',
-        'Logout': 'swagger.logout',
     };
     function translateSwaggerUI() {
         document.querySelectorAll('.swagger-ui button, .swagger-ui .btn').forEach(btn => {

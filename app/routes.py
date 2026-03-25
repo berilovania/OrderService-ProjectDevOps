@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .auth import require_api_key
 from .database import get_db
 from .db_models import OrderTable
 from .models import Order, OrderCreate, OrderStatus, StatusUpdate
@@ -10,7 +9,7 @@ from .models import Order, OrderCreate, OrderStatus, StatusUpdate
 router = APIRouter()
 
 
-@router.post("/orders", response_model=Order, status_code=201, dependencies=[Depends(require_api_key)],
+@router.post("/orders", response_model=Order, status_code=201,
              summary="Criar pedido (Create order)",
              description="Cria um novo pedido no sistema (Creates a new order)")
 async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)):
@@ -53,7 +52,7 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
     return _row_to_order(row)
 
 
-@router.patch("/orders/{order_id}/status", response_model=Order, dependencies=[Depends(require_api_key)],
+@router.patch("/orders/{order_id}/status", response_model=Order,
               summary="Atualizar status (Update status)",
               description="Atualiza o status de um pedido (Updates an order status)")
 async def update_order_status(
@@ -70,7 +69,7 @@ async def update_order_status(
     return _row_to_order(row)
 
 
-@router.delete("/orders/{order_id}", response_model=Order, dependencies=[Depends(require_api_key)],
+@router.delete("/orders/{order_id}", response_model=Order,
                summary="Cancelar pedido (Cancel order)",
                description="Cancela um pedido existente (Cancels an existing order)")
 async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):

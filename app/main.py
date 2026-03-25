@@ -1,6 +1,5 @@
 import asyncio
 import ipaddress
-import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -13,6 +12,8 @@ from .database import engine, init_db, async_session
 from .docs_page import get_docs_html
 from .metrics import instrumentator
 from .routes import router
+
+import os
 
 DATA_RETENTION_HOURS = int(os.getenv("DATA_RETENTION_HOURS", "24"))
 
@@ -92,8 +93,6 @@ async def health():
 
 instrumentator.instrument(app)
 
-API_KEY = os.getenv("API_KEY", "")
-
 
 @app.get("/metrics", include_in_schema=False)
 async def metrics_endpoint(request: Request):
@@ -104,10 +103,7 @@ async def metrics_endpoint(request: Request):
     except ValueError:
         is_internal = False
 
-    api_key = request.headers.get("X-API-Key", "")
-    has_valid_key = bool(API_KEY) and api_key == API_KEY
-
-    if not (is_internal or has_valid_key):
+    if not is_internal:
         raise HTTPException(status_code=403, detail="Forbidden")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

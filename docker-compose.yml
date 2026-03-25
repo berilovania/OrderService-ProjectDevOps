@@ -23,7 +23,6 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-orders}
       DATABASE_NAME: ${DATABASE_NAME:-orders}
       DATA_RETENTION_HOURS: ${DATA_RETENTION_HOURS:-24}
-      API_KEY: ${API_KEY:-}
 
 volumes:
   postgres_data:

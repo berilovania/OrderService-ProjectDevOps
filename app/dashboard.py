@@ -6,7 +6,7 @@ def get_dashboard_html():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Service</title>
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light');document.documentElement.classList.add('no-trans');</script>
+    <script>document.documentElement.setAttribute('data-theme','dark');document.documentElement.classList.add('no-trans');</script>
     <style>
         html.no-trans * { transition: none !important; }
         /* ── Tokens: Light ──────────────────────── */
@@ -139,36 +139,6 @@ def get_dashboard_html():
         .icon-btn:hover {
             background: var(--bg-subtle); border-color: var(--border-strong);
             transform: scale(1.08);
-        }
-
-        /* ── Lock / API Key ──────────────────────── */
-        .lock-wrapper {
-            position: relative;
-            margin-left: 4px;
-        }
-        .lock-popover {
-            display: none;
-            position: absolute; top: calc(100% + 4px); right: 0;
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: var(--radius); box-shadow: var(--shadow-lg);
-            padding: 14px 16px; min-width: 240px; z-index: 300;
-        }
-        .lock-wrapper.open .lock-popover { display: block; }
-        .lock-label {
-            font-size: 0.8em; font-weight: 600; color: var(--text-muted);
-            margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .lock-input {
-            width: 100%; padding: 7px 10px;
-            border: 1px solid var(--border); border-radius: var(--radius-sm);
-            background: var(--bg-subtle); color: var(--text);
-            font-size: 0.88em; font-family: inherit;
-            transition: border-color var(--transition);
-            margin-bottom: 8px; display: block;
-        }
-        .lock-input:focus { outline: none; border-color: var(--primary); }
-        .lock-actions {
-            display: flex; gap: 6px; justify-content: flex-end;
         }
 
         /* ── Layout ─────────────────────────────── */
@@ -490,18 +460,6 @@ def get_dashboard_html():
                 </button>
             </div>
         </div>
-        <div class="lock-wrapper" id="lock-wrapper">
-            <button class="icon-btn" id="lock-btn" title="API Key" onclick="toggleLockMenu()">🔓</button>
-            <div class="lock-popover" id="lock-popover">
-                <p class="lock-label" data-i18n="lock.title">API KEY</p>
-                <input class="lock-input" type="password" id="api-key-input" autocomplete="off" />
-                <div class="lock-actions">
-                    <button class="btn btn-ghost" style="font-size:0.82em;padding:5px 12px;" onclick="clearApiKey()" data-i18n="lock.clear">Limpar</button>
-                    <button class="btn btn-primary" style="font-size:0.82em;padding:5px 12px;" onclick="saveApiKey()" data-i18n="lock.save">Salvar</button>
-                </div>
-            </div>
-        </div>
-        <button class="icon-btn" id="theme-btn" title="Tema / Theme" onclick="toggleTheme()">🌙</button>
     </div>
 </nav>
 
@@ -639,12 +597,6 @@ const TR = {
         'toast.err.delete': 'Erro ao cancelar pedido.',
         'pager.prev': 'Anterior',
         'pager.next': 'Próxima',
-        'lock.title': 'API KEY',
-        'lock.save': 'Salvar',
-        'lock.clear': 'Limpar',
-        'lock.placeholder': 'Insira a API key…',
-        'toast.auth.saved': 'API key salva.',
-        'toast.auth.cleared': 'API key removida.',
     },
     en: {
         'nav.home':        'Dashboard',
@@ -682,12 +634,6 @@ const TR = {
         'toast.err.delete': 'Failed to cancel order.',
         'pager.prev': 'Previous',
         'pager.next': 'Next',
-        'lock.title': 'API KEY',
-        'lock.save': 'Save',
-        'lock.clear': 'Clear',
-        'lock.placeholder': 'Enter API key…',
-        'toast.auth.saved': 'API key saved.',
-        'toast.auth.cleared': 'API key removed.',
     },
 };
 
@@ -695,7 +641,7 @@ const ICONS = { created:'🟡', processing:'🔵', completed:'🟢', cancelled:'
 const BADGE = { created:'b-created', processing:'b-processing', completed:'b-completed', cancelled:'b-cancelled' };
 
 let currentLang = localStorage.getItem('lang') || 'pt';
-let currentTheme = localStorage.getItem('theme') || 'light';
+let currentTheme = 'dark';
 let LABELS = {};
 
 function t(key) { return TR[currentLang][key] ?? TR['pt'][key] ?? key; }
@@ -721,8 +667,6 @@ function applyLang(lang) {
     document.getElementById('check-pt').textContent = lang === 'pt' ? '✓' : '';
     document.getElementById('check-en').textContent = lang === 'en' ? '✓' : '';
     // force re-render to update dynamic status labels
-    const lockInput = document.getElementById('api-key-input');
-    if (lockInput) lockInput.placeholder = t('lock.placeholder');
     ordersCache = null;
     loadOrders();
 }
@@ -737,24 +681,10 @@ function selectLang(lang) {
 document.addEventListener('click', (e) => {
     const sel = document.getElementById('lang-selector');
     if (sel && !sel.contains(e.target)) sel.classList.remove('open');
-    const lw = document.getElementById('lock-wrapper');
-    if (lw && !lw.contains(e.target)) lw.classList.remove('open');
 });
 
-// ── Theme ─────────────────────────────────
-function applyTheme(theme) {
-    currentTheme = theme;
-    document.documentElement.setAttribute('data-theme', theme);
-    document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
-    localStorage.setItem('theme', theme);
-}
-function toggleTheme() { applyTheme(currentTheme === 'dark' ? 'light' : 'dark'); }
-
-// Cross-tab sync
 window.addEventListener('storage', e => {
-    if (e.key === 'theme' && e.newValue) applyTheme(e.newValue);
     if (e.key === 'lang'  && e.newValue) applyLang(e.newValue);
-    if (e.key === 'apiKey') updateLockBtn();
 });
 
 // ── Toast ─────────────────────────────────
@@ -981,12 +911,6 @@ async function refresh() {
     toast(t('toast.refresh'));
 }
 
-// ── Auth ──────────────────────────────────
-function getAuthHeaders() {
-    const key = localStorage.getItem('apiKey');
-    return key ? { 'X-API-Key': key } : {};
-}
-
 // ── Create ────────────────────────────────
 const CUSTOMERS = ['João Silva','Maria Santos','Pedro Costa','Ana Oliveira','Carlos Souza','Beatriz Lima'];
 const ITEMS_LIST = [
@@ -1007,7 +931,7 @@ async function createOrder() {
 
     try {
         const res = await fetch(`${BASE}/orders`, {
-            method: 'POST', headers: {'Content-Type':'application/json', ...getAuthHeaders()},
+            method: 'POST', headers: {'Content-Type':'application/json'},
             body: JSON.stringify({customer, items, total}),
         });
         if (!res.ok) throw new Error();
@@ -1029,7 +953,7 @@ async function deleteOrder(id) {
     const el = document.getElementById(`o-${id}`);
     if (el) el.classList.add('removing');
     try {
-        const res = await fetch(`${BASE}/orders/${id}`, {method:'DELETE', headers: getAuthHeaders()});
+        const res = await fetch(`${BASE}/orders/${id}`, {method:'DELETE'});
         if (!res.ok) throw new Error();
         await new Promise(r => setTimeout(r, 300));
         ordersCache = null;
@@ -1041,54 +965,8 @@ async function deleteOrder(id) {
     }
 }
 
-// ── Lock / API Key ─────────────────────────
-function updateLockBtn() {
-    const key = localStorage.getItem('apiKey');
-    const btn = document.getElementById('lock-btn');
-    if (btn) btn.textContent = key ? '🔐' : '🔓';
-}
-
-function toggleLockMenu() {
-    const wrapper = document.getElementById('lock-wrapper');
-    if (!wrapper) return;
-    const isOpen = wrapper.classList.contains('open');
-    if (!isOpen) {
-        const key = localStorage.getItem('apiKey');
-        const input = document.getElementById('api-key-input');
-        if (input) {
-            input.value = key || '';
-            input.placeholder = t('lock.placeholder');
-        }
-    }
-    wrapper.classList.toggle('open');
-}
-
-function saveApiKey() {
-    const input = document.getElementById('api-key-input');
-    const key = input ? input.value.trim() : '';
-    if (key) {
-        localStorage.setItem('apiKey', key);
-    } else {
-        localStorage.removeItem('apiKey');
-    }
-    updateLockBtn();
-    document.getElementById('lock-wrapper')?.classList.remove('open');
-    toast(key ? t('toast.auth.saved') : t('toast.auth.cleared'));
-}
-
-function clearApiKey() {
-    localStorage.removeItem('apiKey');
-    const input = document.getElementById('api-key-input');
-    if (input) input.value = '';
-    updateLockBtn();
-    document.getElementById('lock-wrapper')?.classList.remove('open');
-    toast(t('toast.auth.cleared'));
-}
-
 // ── Init ──────────────────────────────────
-applyTheme(currentTheme);
 applyLang(currentLang);
-updateLockBtn();
 requestAnimationFrame(() => document.documentElement.classList.remove('no-trans'));
 setInterval(loadOrders, 8000);
 </script>
