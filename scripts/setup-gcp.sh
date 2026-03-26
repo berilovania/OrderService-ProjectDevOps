@@ -19,8 +19,8 @@ sudo apt-get update && sudo apt-get upgrade -y
 if command -v k3s &>/dev/null; then
   echo "==> k3s already installed, skipping..."
 else
-  echo "==> Installing k3s (kubeconfig readable by current user)..."
-  curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
+  echo "==> Installing k3s (kubeconfig readable by current user, Traefik disabled)..."
+  curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644 --disable traefik
 fi
 
 echo "==> Configuring kubectl for current user..."
