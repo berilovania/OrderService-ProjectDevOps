@@ -14,8 +14,9 @@ A aplicação — uma API REST de gerenciamento de pedidos construída com FastA
 - **Infraestrutura como código** — manifests Kubernetes versionados no repositório
 - **Deploy real em nuvem** — cluster Kubernetes rodando em VM GCP Compute Engine
 - **Boas práticas de containerização** — imagem Docker otimizada com multi-stage build
-- **Observabilidade** — métricas Prometheus, health checks e probes de liveness/readiness
+- **Observabilidade** — métricas Prometheus, dashboards Grafana, health checks e probes de liveness/readiness
 - **Segurança em camadas** — container não-root, securityContext, scan de vulnerabilidades Trivy
+- **HTTPS automático** — TLS via cert-manager + Let's Encrypt, renovação automática, domínio customizado
 
 ---
 
@@ -66,10 +67,12 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 │   │   │                                      │   │                   │
 │   │   └──────────────────────────────────────┘   │                   │
 │   │                                              │                   │
-│   │   NodePort :30080 ──► :8000                  │                   │
+│   │   NodePort :30080 ──► :8000  (acesso direto) │                   │
+│   │   NGINX Ingress :80/:443 ──► :8000           │                   │
 │   └──────────────────────────────────────────────┘                   │
 │                                                                      │
-│   Usuário ──► http://<GCP_IP>:30080                                  │
+│   Usuário ──► https://<DOMINIO>       (HTTPS via cert-manager)       │
+│   Usuário ──► http://<GCP_IP>:30080   (NodePort direto)              │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -83,6 +86,8 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 | **GHCR** | Armazena as imagens Docker versionadas por commit SHA |
 | **k3s** | Distribuição leve do Kubernetes que roda na VM GCP |
 | **PostgreSQL** | Persistência de dados com volume Kubernetes |
+| **NGINX Ingress Controller** | Roteamento HTTP/HTTPS com rate-limiting e TLS termination |
+| **cert-manager + Let's Encrypt** | Provisionamento e renovação automática de certificados TLS |
 | **GCP Compute Engine** | Infraestrutura cloud onde o cluster é executado |
 
 ---
@@ -99,6 +104,9 @@ O fluxo de entrega segue o modelo GitOps simplificado: o repositório é a fonte
 | **CI/CD** | GitHub Actions | Automação do pipeline de entrega |
 | **Registry** | GitHub Container Registry (GHCR) | Armazenamento de imagens Docker |
 | **Monitoramento** | Prometheus (prometheus-fastapi-instrumentator) | Coleta de métricas da aplicação |
+| **Dashboards** | Grafana | Visualização de métricas com datasource Prometheus auto-provisionado |
+| **Ingress** | NGINX Ingress Controller | Roteamento HTTP/HTTPS, rate-limiting, TLS termination |
+| **TLS** | cert-manager + Let's Encrypt (HTTP-01) | Certificados automáticos com renovação sem intervenção manual |
 | **Cloud** | GCP Compute Engine (Ubuntu 22.04) | Hospedagem do cluster Kubernetes |
 | **Versionamento** | Git + GitHub | Controle de código e colaboração |
 
@@ -147,7 +155,7 @@ Aplica a nova versão no cluster Kubernetes:
 - Copia os manifests `k8s/` via SCP para a VM GCP
 - Conecta na VM GCP via SSH e executa:
   - Criação/atualização do Secret (credenciais PostgreSQL, direto no cluster, sem gravar em disco)
-  - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`)
+  - Substituição de placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`, `__DOMAIN__`, `__ACME_EMAIL__`)
   - `kubectl apply` em todos os manifests com validação habilitada
   - Aguarda o StatefulSet do PostgreSQL ficar pronto (timeout: 180s)
   - `kubectl set image` para atualizar a imagem do deployment com o SHA do commit
@@ -161,6 +169,8 @@ Aplica a nova versão no cluster Kubernetes:
 | `GCP_HOST` | External IP da VM GCP |
 | `GCP_SSH_KEY` | Chave privada SSH |
 | `DB_PASSWORD` | Senha do PostgreSQL para o cluster |
+| `DOMAIN` | Domínio do serviço (ex: `order-service.matheuscaldas.com`) |
+| `ACME_EMAIL` | Email para notificações Let's Encrypt |
 
 > O `GITHUB_TOKEN` é provido automaticamente pelo GitHub Actions com permissões de `contents: read` e `packages: write`.
 
@@ -232,15 +242,25 @@ A aplicação roda em um cluster **k3s** com os seguintes recursos Kubernetes:
 - Limites de recursos ajustados para e2-small (2GB RAM): CPU 300m, memória 256Mi
 - **SecurityContext** — `allowPrivilegeEscalation: false`
 
-### Service — NodePort + Ingress
+### Service — NodePort + Ingress HTTPS
 
-A aplicação é exposta externamente através de um **Service NodePort** na porta `30080`:
+A aplicação é exposta de duas formas:
 
 ```
-User ──► GCP_IP:30080 ──► Service (NodePort) ──► Pod :8000
+# Via domínio (produção)
+Usuário ──► https://<DOMINIO> ──► NGINX Ingress (:443) ──► Pod :8000
+
+# Via NodePort (acesso direto / debug)
+Usuário ──► GCP_IP:30080 ──► Service (NodePort) ──► Pod :8000
 ```
 
-O projeto inclui também um **Ingress NGINX** (`k8s/ingress.yaml`) com rate-limiting (10 req/s), preparado para TLS via cert-manager.
+O **NGINX Ingress Controller** (`k8s/ingress.yaml`) gerencia:
+- Rate-limiting: 10 req/s (burst até 30)
+- Redirect HTTP → HTTPS automático (308)
+- TLS termination com certificado Let's Encrypt (renovado automaticamente pelo cert-manager)
+- Bloqueio do endpoint `/metrics` a nível de Ingress
+
+O **cert-manager** (`k8s/clusterissuer.yaml`) provisiona certificados via ACME HTTP-01 com o Let's Encrypt production. O certificado é armazenado no Secret `order-service-tls` e renovado automaticamente antes do vencimento.
 
 ### Self-healing e resiliência
 
@@ -264,21 +284,30 @@ O cluster Kubernetes roda em uma **VM GCP Compute Engine** com a seguinte config
 | **Tipo de instância** | e2-small (2 vCPU shared, 2GB RAM) |
 | **Distribuição Kubernetes** | k3s (leve, single-node) |
 | **IP** | External IP (estático) |
-| **Portas abertas** | 22 (SSH), 30080 (aplicação), 6443 (API Kubernetes) |
+| **Portas abertas** | 22 (SSH), 80 (HTTP/redirect), 443 (HTTPS), 30080 (NodePort direto), 6443 (API Kubernetes) |
 
 ### Deploy real em produção
 
 Este **não é um projeto que roda apenas localmente**. A aplicação está configurada para deploy em um cluster Kubernetes real na GCP, acessível publicamente pela internet.
 
 O script `scripts/setup-gcp.sh` automatiza toda a preparação do servidor:
+
+```bash
+bash scripts/setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>
+```
+
 1. Atualiza o sistema operacional
-2. Instala o k3s e configura o `kubectl`
-3. Cria o pull secret para autenticação no GHCR
-4. Substitui placeholders nos manifests
-5. Aplica todos os manifests Kubernetes
-6. Aguarda os deployments ficarem prontos
+2. Instala o k3s (com Traefik desabilitado) e configura o `kubectl`
+3. Instala o NGINX Ingress Controller e habilita snippet annotations
+4. Instala o cert-manager e aguarda o webhook estar pronto
+5. Cria os secrets (GHCR, PostgreSQL)
+6. Substitui placeholders nos manifests (`__GITHUB_USER__`, `__IMAGE_NAME__`, `__DOMAIN__`, `__ACME_EMAIL__`)
+7. Aplica todos os manifests Kubernetes (incluindo ClusterIssuer e Ingress)
+8. Aguarda os deployments ficarem prontos
 
 Após a execução do setup, o pipeline CI/CD assume: qualquer push na `main` atualiza a aplicação automaticamente.
+
+> **Pré-requisito:** apontar o A record do subdomínio para o External IP da VM GCP antes de rodar o script — necessário para o desafio HTTP-01 do Let's Encrypt.
 
 ---
 
@@ -321,9 +350,15 @@ O projeto aplica segurança em múltiplas camadas:
 
 Todos os endpoints (`POST`, `PATCH`, `DELETE`, `GET`) são públicos — sem autenticação por API key.
 
+### HTTPS / TLS
+
+Todo o tráfego externo passa por HTTPS. O certificado TLS é emitido automaticamente pelo **cert-manager** via Let's Encrypt (HTTP-01) e renovado antes do vencimento sem intervenção manual. HTTP é redirecionado para HTTPS com `308 Permanent Redirect`.
+
 ### Métricas protegidas
 
-O endpoint `/metrics` aceita requisições apenas de IPs internos (`127.0.0.1`, redes RFC1918). Requisições externas recebem `403 Forbidden`.
+O endpoint `/metrics` é protegido em duas camadas:
+1. **Ingress** — bloqueado via `server-snippet` antes de chegar à aplicação
+2. **Aplicação** — aceita apenas IPs internos (loopback / RFC1918) para acesso direto via NodePort
 
 ### Container não-root
 
@@ -373,6 +408,8 @@ Acesse:
 - **API Docs:** http://localhost:8000/docs
 - **Métricas:** http://localhost:8000/metrics
 - **Health check:** http://localhost:8000/health
+- **Prometheus:** http://localhost:9090
+- **Grafana:** http://localhost:3000 (usuário: `admin` / senha: `admin`)
 
 ### Opção 2 — Docker (imagem avulsa)
 
@@ -464,7 +501,8 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── postgres-service.yaml       # Headless Service na porta 5432
 │   ├── deployment.yaml             # Deployment da aplicação (2 réplicas, probes, securityContext)
 │   ├── service.yaml                # Service NodePort na porta 30080
-│   └── ingress.yaml                # Ingress NGINX com rate-limiting
+│   ├── ingress.yaml                # Ingress NGINX com rate-limiting, TLS e bloqueio de /metrics
+│   └── clusterissuer.yaml          # cert-manager ClusterIssuer (Let's Encrypt HTTP-01)
 │
 ├── scripts/
 │   ├── setup-gcp.sh                # Provisionamento da VM GCP (k3s + manifests)
@@ -474,8 +512,16 @@ O que acontece automaticamente após um `git push origin main`:
 ├── .github/workflows/
 │   └── deploy.yml                  # Pipeline CI/CD (test → build+scan → deploy)
 │
+├── prometheus/
+│   └── prometheus.yml              # Configuração do scrape do endpoint /metrics
+│
+├── grafana/
+│   └── provisioning/
+│       └── datasources/
+│           └── datasource.yml      # Auto-provisionamento do datasource Prometheus
+│
 ├── Dockerfile                      # Multi-stage build (builder + runtime)
-├── docker-compose.yml              # Stack local (app + PostgreSQL)
+├── docker-compose.yml              # Stack local (app + PostgreSQL + Prometheus + Grafana)
 ├── pytest.ini                      # Configuração do pytest
 ├── .env.example                    # Template de variáveis de ambiente
 ├── favicon.ico                     # Ícone customizado do serviço
@@ -488,9 +534,7 @@ O que acontece automaticamente após um `git push origin main`:
 
 | Melhoria | Descrição |
 |----------|-----------|
-| **Observabilidade completa** | Integrar Grafana para dashboards visuais sobre as métricas Prometheus já coletadas |
 | **Auto scaling (HPA)** | Configurar Horizontal Pod Autoscaler para escalar réplicas baseado em CPU/memória |
-| **TLS com cert-manager** | Ativar o Ingress NGINX já configurado com cert-manager + Let's Encrypt para HTTPS automático |
 | **Ambientes separados** | Criar namespaces para staging e produção com promoção controlada |
 | **Infrastructure as Code** | Provisionar a VM GCP com Terraform em vez de setup manual |
 | **GitOps com ArgoCD** | Substituir o deploy via SSH por reconciliação declarativa com ArgoCD |
