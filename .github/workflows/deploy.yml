@@ -129,6 +129,7 @@ jobs:
             sed -i "s|__IMAGE_NAME__|$IMAGE_NAME|g" deployment.yaml
             sed -i "s|__DOMAIN__|$DOMAIN|g" ingress.yaml
             sed -i "s|__ACME_EMAIL__|$ACME_EMAIL|g" clusterissuer.yaml
+            sed -i "s|__DOMAIN__|$DOMAIN|g" monitoring/grafana-deployment.yaml
 
             # Apply manifests (postgres-secret.yaml excluded — managed above)
             kubectl apply -f namespace.yaml
@@ -164,3 +165,17 @@ jobs:
               kubectl logs -n order-service -l app=order-service --tail=50 2>/dev/null || true
               exit 1
             fi
+
+            # Deploy monitoring stack
+            kubectl apply -f monitoring/namespace.yaml
+            kubectl apply -f monitoring/prometheus-config.yaml
+            kubectl apply -f monitoring/prometheus-deployment.yaml
+            kubectl apply -f monitoring/prometheus-service.yaml
+            kubectl apply -f monitoring/grafana-datasource.yaml
+            kubectl apply -f monitoring/grafana-dashboard-provider.yaml
+            kubectl apply -f monitoring/grafana-dashboard.yaml
+            kubectl apply -f monitoring/grafana-deployment.yaml
+            kubectl apply -f monitoring/grafana-service.yaml
+            kubectl apply -f grafana-externalname-service.yaml
+            kubectl rollout status deployment/prometheus -n monitoring --timeout=120s
+            kubectl rollout status deployment/grafana -n monitoring --timeout=120s
