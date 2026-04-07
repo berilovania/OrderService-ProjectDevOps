@@ -19,6 +19,13 @@ spec:
     - host: __DOMAIN__
       http:
         paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-external
+                port:
+                  number: 3000
           - path: /
             pathType: Prefix
             backend:
