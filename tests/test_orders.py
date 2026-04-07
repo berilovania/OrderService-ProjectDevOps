@@ -35,3 +35,20 @@ async def test_pedido_nao_encontrado():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/orders/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pagina_inicial_tem_link_grafana():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "/grafana" in response.text
+
+
+@pytest.mark.asyncio
+async def test_pagina_inicial_tem_link_docs():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/")
+    assert response.status_code == 200
+    assert "/docs" in response.text
