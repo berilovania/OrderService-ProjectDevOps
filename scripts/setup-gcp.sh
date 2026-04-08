@@ -104,6 +104,15 @@ kubectl create secret generic metrics-token \
   --dry-run=client -o yaml | kubectl apply -f -
 echo "  Metrics token generated and stored. Save this for CI/CD METRICS_TOKEN secret: ${METRICS_TOKEN}"
 
+echo "==> Generating Grafana admin password..."
+GRAFANA_PASSWORD=$(openssl rand -base64 18)
+kubectl create secret generic grafana-admin \
+  --from-literal=admin-password="${GRAFANA_PASSWORD}" \
+  --namespace monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "  Grafana admin password: ${GRAFANA_PASSWORD}"
+echo "  Login at https://${DOMAIN}/grafana with user: admin"
+
 echo "==> Waiting for default service account..."
 until kubectl get serviceaccount default -n order-service &>/dev/null; do
   echo "  default SA not ready yet, retrying in 2s..."

@@ -26,13 +26,13 @@ spec:
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: "true"
             - name: GF_AUTH_ANONYMOUS_ENABLED
-              value: "true"
-            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-              value: "Viewer"
+              value: "false"
             - name: GF_AUTH_DISABLE_LOGIN_FORM
-              value: "true"
+              value: "false"
             - name: GF_SECURITY_ALLOW_EMBEDDING
-              value: "true"
+              value: "false"
+            - name: GF_SECURITY_ADMIN_PASSWORD__FILE
+              value: "/run/secrets/grafana/admin-password"
             - name: GF_PATHS_PROVISIONING
               value: "/etc/grafana/provisioning"
           resources:
@@ -51,6 +51,9 @@ spec:
               mountPath: /var/lib/grafana/dashboards
             - name: storage
               mountPath: /var/lib/grafana
+            - name: grafana-admin-secret
+              mountPath: /run/secrets/grafana
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /grafana/api/health
@@ -75,3 +78,6 @@ spec:
             name: grafana-dashboard
         - name: storage
           emptyDir: {}
+        - name: grafana-admin-secret
+          secret:
+            secretName: grafana-admin
