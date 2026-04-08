@@ -2,36 +2,110 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info/
-dist/
+*.so
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
 *.egg
+MANIFEST
+
+# Pyenv
+.python-version
+
+# Virtual Environments
 .venv/
 venv/
-env/
+ENV/
+env.bak/
+venv.bak/
 
-# IDE
+# Testing
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+tests/*/cache
+tests/*/tmp
+
+# IDEs
 .vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Docker
 *.tar
+docker-compose.override.yml
 
-# Env
+# Environment Variables and Secrets
 .env
+.env.*
+!.env.example
 *.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
 
-# Misc
+# Logs
 *.log
-fix.md
+logs/
+*.out
+docs/
 
-# Claude Code
+# Databases and Data
+*.sqlite
+*.sqlite3
+*.db
+prometheus/data/
+grafana/data/
+
+# DevOps Project Specifics
+dist/
+build/
+temp/
+tmp/
+*.zip
+*.gz
+*.rar
+
+# Claude & Tools
 CLAUDE.md
 .claude/
-docs/
+fix.md
