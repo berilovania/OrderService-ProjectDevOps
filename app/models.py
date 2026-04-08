@@ -13,9 +13,9 @@ class OrderStatus(str, Enum):
 
 
 class OrderCreate(BaseModel):
-    customer: str
-    items: list[str]
-    total: float
+    customer: str = Field(..., min_length=1, max_length=255)
+    items: list[str] = Field(..., min_length=1, max_length=100)
+    total: float = Field(..., gt=0, le=999_999.99)
 
 
 class StatusUpdate(BaseModel):

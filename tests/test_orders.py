@@ -52,3 +52,59 @@ async def test_pagina_inicial_tem_link_docs():
         response = await client.get("/")
     assert response.status_code == 200
     assert "/docs" in response.text
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_customer_vazio():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "", "items": ["notebook"], "total": 100.0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_customer_muito_longo():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "A" * 256, "items": ["notebook"], "total": 100.0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_total_negativo():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Alice", "items": ["notebook"], "total": -10.0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_total_zero():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Alice", "items": ["notebook"], "total": 0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_items_vazio():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Alice", "items": [], "total": 100.0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_items_demais():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Alice", "items": [f"item{i}" for i in range(101)], "total": 100.0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_total_excessivo():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Alice", "items": ["notebook"], "total": 10_000_000.0}
+        response = await client.post("/orders", json=payload)
+    assert response.status_code == 422
