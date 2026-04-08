@@ -6,11 +6,16 @@ set -euo pipefail
 # Usage: ssh into GCP VM as user 'gcp', then run: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] [DOMAIN] [ACME_EMAIL]
 # ============================================================
 
-GITHUB_USER="${1:?Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
-IMAGE_NAME="${2:-orderservice-projectdevops}"
-DB_PASSWORD="${3:-orderpass}"
-DOMAIN="${4:?Error: DOMAIN argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
-ACME_EMAIL="${5:?Error: ACME_EMAIL argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD] <DOMAIN> <ACME_EMAIL>}"
+GITHUB_USER="${1:?Usage: bash setup-gcp.sh <GITHUB_USER> <DB_PASSWORD> <DOMAIN> <ACME_EMAIL> [IMAGE_NAME]}"
+DB_PASSWORD="${2:?Error: DB_PASSWORD argument is required. Do not use weak defaults.}"
+DOMAIN="${3:?Error: DOMAIN argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> <DB_PASSWORD> <DOMAIN> <ACME_EMAIL> [IMAGE_NAME]}"
+ACME_EMAIL="${4:?Error: ACME_EMAIL argument is required. Usage: bash setup-gcp.sh <GITHUB_USER> <DB_PASSWORD> <DOMAIN> <ACME_EMAIL> [IMAGE_NAME]}"
+IMAGE_NAME="${5:-orderservice-projectdevops}"
+
+if [ "${#DB_PASSWORD}" -lt 12 ]; then
+  echo "ERROR: DB_PASSWORD must be at least 12 characters long." >&2
+  exit 1
+fi
 IMAGE="ghcr.io/${GITHUB_USER}/${IMAGE_NAME}:latest"
 
 echo "==> Updating system..."
@@ -84,6 +89,20 @@ kubectl create secret generic postgres-secret \
   --from-literal=POSTGRES_DB="orders" \
   --namespace order-service \
   --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Generating metrics token..."
+METRICS_TOKEN=$(openssl rand -hex 32)
+kubectl create secret generic metrics-token \
+  --from-literal=metrics-token="${METRICS_TOKEN}" \
+  --namespace order-service \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic metrics-token \
+  --from-literal=metrics-token="${METRICS_TOKEN}" \
+  --namespace monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "  Metrics token generated and stored. Save this for CI/CD METRICS_TOKEN secret: ${METRICS_TOKEN}"
 
 echo "==> Waiting for default service account..."
 until kubectl get serviceaccount default -n order-service &>/dev/null; do

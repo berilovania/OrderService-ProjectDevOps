@@ -6,9 +6,14 @@ set -euo pipefail
 # Usage: ssh into EC2, then run: bash setup-ec2.sh <GITHUB_USER> [IMAGE_NAME] [DB_PASSWORD]
 # ============================================================
 
-GITHUB_USER="${1:?Usage: bash setup-ec2.sh <GITHUB_USER>}"
-IMAGE_NAME="${2:-orderservice-projectdevops}"
-DB_PASSWORD="${3:-orderpass}"
+GITHUB_USER="${1:?Usage: bash setup-ec2.sh <GITHUB_USER> <DB_PASSWORD> [IMAGE_NAME]}"
+DB_PASSWORD="${2:?Error: DB_PASSWORD argument is required. Do not use weak defaults.}"
+IMAGE_NAME="${3:-orderservice-projectdevops}"
+
+if [ "${#DB_PASSWORD}" -lt 12 ]; then
+  echo "ERROR: DB_PASSWORD must be at least 12 characters long." >&2
+  exit 1
+fi
 IMAGE="ghcr.io/${GITHUB_USER}/${IMAGE_NAME}:latest"
 
 echo "==> Updating system..."
@@ -53,6 +58,20 @@ kubectl create secret generic postgres-secret \
   --from-literal=POSTGRES_DB="orders" \
   --namespace order-service \
   --dry-run=client -o yaml | kubectl apply -f -
+
+echo "==> Generating metrics token..."
+METRICS_TOKEN=$(openssl rand -hex 32)
+kubectl create secret generic metrics-token \
+  --from-literal=metrics-token="${METRICS_TOKEN}" \
+  --namespace order-service \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic metrics-token \
+  --from-literal=metrics-token="${METRICS_TOKEN}" \
+  --namespace monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "  Metrics token generated and stored. Save this for CI/CD METRICS_TOKEN secret: ${METRICS_TOKEN}"
 
 echo "==> Waiting for default service account to be created..."
 until kubectl get serviceaccount default -n order-service &>/dev/null; do
