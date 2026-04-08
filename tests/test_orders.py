@@ -119,3 +119,24 @@ async def test_rejeitar_total_excessivo():
         payload = {"customer": "Alice", "items": ["notebook"], "total": 10_000_000.0}
         response = await client.post("/orders", json=payload)
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_order_id_invalido():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/orders/not-a-uuid")
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_order_id_invalido_no_patch():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.patch("/orders/not-a-uuid/status", json={"status": "processing"})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejeitar_order_id_invalido_no_delete():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.delete("/orders/not-a-uuid")
+    assert response.status_code == 422

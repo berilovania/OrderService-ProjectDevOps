@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,8 +47,8 @@ async def list_orders(
 @router.get("/orders/{order_id}", response_model=Order,
             summary="Buscar pedido (Get order)",
             description="Busca um pedido pelo ID (Gets an order by ID)")
-async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
-    row = await db.get(OrderTable, order_id)
+async def get_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
+    row = await db.get(OrderTable, str(order_id))
     if row is None:
         raise HTTPException(status_code=404, detail="Order not found")
     return _row_to_order(row)
@@ -56,9 +58,9 @@ async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
               summary="Atualizar status (Update status)",
               description="Atualiza o status de um pedido (Updates an order status)")
 async def update_order_status(
-    order_id: str, payload: StatusUpdate, db: AsyncSession = Depends(get_db)
+    order_id: UUID, payload: StatusUpdate, db: AsyncSession = Depends(get_db)
 ):
-    row = await db.get(OrderTable, order_id)
+    row = await db.get(OrderTable, str(order_id))
     if row is None:
         raise HTTPException(status_code=404, detail="Order not found")
     if row.status == OrderStatus.cancelled.value:
@@ -72,8 +74,8 @@ async def update_order_status(
 @router.delete("/orders/{order_id}", response_model=Order,
                summary="Cancelar pedido (Cancel order)",
                description="Cancela um pedido existente (Cancels an existing order)")
-async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
-    row = await db.get(OrderTable, order_id)
+async def cancel_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
+    row = await db.get(OrderTable, str(order_id))
     if row is None:
         raise HTTPException(status_code=404, detail="Order not found")
     row.status = OrderStatus.cancelled.value
