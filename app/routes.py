@@ -34,7 +34,7 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
             description="Retorna todos os pedidos com paginação (Returns all orders with pagination)")
 async def list_orders(
     skip: int = Query(0, ge=0),
-    limit: int = Query(200, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
