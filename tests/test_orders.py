@@ -55,6 +55,17 @@ async def test_pagina_inicial_tem_link_docs():
 
 
 @pytest.mark.asyncio
+async def test_security_headers_presentes():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/health")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert "default-src" in response.headers["Content-Security-Policy"]
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["Permissions-Policy"] == "camera=(), microphone=(), geolocation=()"
+
+
+@pytest.mark.asyncio
 async def test_rejeitar_customer_vazio():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         payload = {"customer": "", "items": ["notebook"], "total": 100.0}
