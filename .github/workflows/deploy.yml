@@ -105,6 +105,7 @@ jobs:
           IMAGE: ${{ env.IMAGE }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
           GITHUB_SHA: ${{ github.sha }}
           REPO_OWNER: ${{ github.repository_owner }}
           DOMAIN: ${{ secrets.DOMAIN }}
@@ -113,14 +114,26 @@ jobs:
           host: ${{ secrets.GCP_HOST }}
           username: gcp
           key: ${{ secrets.GCP_SSH_KEY }}
-          envs: IMAGE,IMAGE_NAME,DB_PASSWORD,GITHUB_SHA,REPO_OWNER,DOMAIN,ACME_EMAIL
+          envs: IMAGE,IMAGE_NAME,DB_PASSWORD,METRICS_TOKEN,GITHUB_SHA,REPO_OWNER,DOMAIN,ACME_EMAIL
           script: |
-            # Create/update secret directly — password never touches disk or shell history
+            set +x  # Ensure no command tracing that could leak secrets
+
+            # Create/update secrets via --dry-run (never touches disk or shell history)
             kubectl create secret generic postgres-secret \
               --from-literal=POSTGRES_PASSWORD="$DB_PASSWORD" \
               --from-literal=POSTGRES_USER="orders" \
               --from-literal=POSTGRES_DB="orders" \
               --namespace order-service \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            kubectl create secret generic metrics-token \
+              --from-literal=metrics-token="$METRICS_TOKEN" \
+              --namespace order-service \
+              --dry-run=client -o yaml | kubectl apply -f -
+
+            kubectl create secret generic metrics-token \
+              --from-literal=metrics-token="$METRICS_TOKEN" \
+              --namespace monitoring \
               --dry-run=client -o yaml | kubectl apply -f -
 
             # Replace non-sensitive placeholders in deployment manifest
@@ -131,7 +144,7 @@ jobs:
             sed -i "s|__ACME_EMAIL__|$ACME_EMAIL|g" clusterissuer.yaml
             sed -i "s|__DOMAIN__|$DOMAIN|g" monitoring/grafana-deployment.yaml
 
-            # Apply manifests (postgres-secret.yaml excluded — managed above)
+            # Apply manifests (secrets managed above via kubectl create)
             kubectl apply -f namespace.yaml
             kubectl apply -f postgres-pvc.yaml
             # Migrate from Deployment to StatefulSet (one-time, safe to repeat)
