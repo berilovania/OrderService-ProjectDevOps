@@ -16,6 +16,7 @@ from .routes import router
 import os
 
 DATA_RETENTION_HOURS = int(os.getenv("DATA_RETENTION_HOURS", "24"))
+METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
 
 
 async def cleanup_old_orders():
@@ -96,15 +97,24 @@ instrumentator.instrument(app)
 
 @app.get("/metrics", include_in_schema=False)
 async def metrics_endpoint(request: Request):
-    client_ip = request.client.host if request.client else ""
-    try:
-        _ip = ipaddress.ip_address(client_ip)
-        is_internal = _ip.is_loopback or _ip.is_private
-    except ValueError:
-        is_internal = False
+    # Layer 1: Token-based authentication (if METRICS_TOKEN is configured)
+    if METRICS_TOKEN:
+        import hmac
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
+        if not token or not hmac.compare_digest(token, METRICS_TOKEN):
+            raise HTTPException(status_code=403, detail="Forbidden")
+    else:
+        # Layer 2 (fallback): IP-based restriction when no token is configured
+        client_ip = request.client.host if request.client else ""
+        try:
+            _ip = ipaddress.ip_address(client_ip)
+            is_internal = _ip.is_loopback or _ip.is_private
+        except ValueError:
+            is_internal = False
 
-    if not is_internal:
-        raise HTTPException(status_code=403, detail="Forbidden")
+        if not is_internal:
+            raise HTTPException(status_code=403, detail="Forbidden")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 

@@ -33,7 +33,11 @@ spec:
               memory: 256Mi
           volumeMounts:
             - name: config
-              mountPath: /etc/prometheus
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: metrics-token
+              mountPath: /etc/prometheus/secrets
+              readOnly: true
             - name: storage
               mountPath: /prometheus
           readinessProbe:
@@ -52,5 +56,8 @@ spec:
         - name: config
           configMap:
             name: prometheus-config
+        - name: metrics-token
+          secret:
+            secretName: metrics-token
         - name: storage
           emptyDir: {}

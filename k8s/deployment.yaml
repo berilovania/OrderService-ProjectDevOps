@@ -70,6 +70,11 @@ spec:
                   key: POSTGRES_DB
             - name: DATA_RETENTION_HOURS
               value: "24"
+            - name: METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: metrics-token
+                  key: metrics-token
           resources:
             requests:
               cpu: 50m
