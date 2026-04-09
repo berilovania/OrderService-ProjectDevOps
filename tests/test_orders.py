@@ -140,3 +140,21 @@ async def test_rejeitar_order_id_invalido_no_delete():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.delete("/orders/not-a-uuid")
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_request_id_gerado_automaticamente():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/health")
+    assert "X-Request-ID" in response.headers
+    # Verify it's a valid UUID
+    import uuid
+    uuid.UUID(response.headers["X-Request-ID"])
+
+
+@pytest.mark.asyncio
+async def test_request_id_preservado_quando_enviado():
+    custom_id = "test-request-123"
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/health", headers={"X-Request-ID": custom_id})
+    assert response.headers["X-Request-ID"] == custom_id
