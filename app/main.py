@@ -15,9 +15,16 @@ from .metrics import instrumentator
 from .routes import router
 
 import os
+import uuid as uuid_mod
+import logging
+
+from .logging_config import setup_logging
 
 DATA_RETENTION_HOURS = int(os.getenv("DATA_RETENTION_HOURS", "24"))
 METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
+
+setup_logging()
+logger = logging.getLogger("order_service")
 
 
 async def cleanup_old_orders():
@@ -80,6 +87,15 @@ async def add_security_headers(request: Request, call_next):
     )
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid_mod.uuid4()))
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
     return response
 
 

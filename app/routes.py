@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .database import get_db
 from .db_models import OrderTable
 from .models import Order, OrderCreate, OrderStatus, StatusUpdate
+import logging
+
+logger = logging.getLogger("order_service.routes")
 
 router = APIRouter()
 
@@ -26,6 +29,14 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
     )
     db.add(row)
     await db.commit()
+    logger.info(
+        "Order created",
+        extra={
+            "action": "create_order",
+            "order_id": order.id,
+            "client_ip": "",
+        },
+    )
     return order
 
 
@@ -67,6 +78,13 @@ async def update_order_status(
         raise HTTPException(status_code=400, detail="Cannot update a cancelled order")
     row.status = payload.status.value
     await db.commit()
+    logger.info(
+        "Order status updated",
+        extra={
+            "action": "update_status",
+            "order_id": str(order_id),
+        },
+    )
     await db.refresh(row)
     return _row_to_order(row)
 
@@ -80,6 +98,13 @@ async def cancel_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Order not found")
     row.status = OrderStatus.cancelled.value
     await db.commit()
+    logger.info(
+        "Order cancelled",
+        extra={
+            "action": "cancel_order",
+            "order_id": str(order_id),
+        },
+    )
     await db.refresh(row)
     return _row_to_order(row)
 

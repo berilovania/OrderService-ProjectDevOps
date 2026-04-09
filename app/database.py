@@ -1,6 +1,9 @@
 import os
+import logging
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+logger = logging.getLogger("order_service.database")
 
 DATABASE_HOST = os.getenv("DATABASE_HOST", "localhost")
 DATABASE_PORT = os.getenv("DATABASE_PORT", "5432")
@@ -32,7 +35,11 @@ async def init_db():
             return
         except Exception as exc:
             if attempt < 29:
-                print(f"DB connection attempt {attempt + 1} failed: {exc} — retrying in 5s...")
+                logger.warning(
+                    "DB connection attempt %d failed: %s — retrying in 5s...",
+                    attempt + 1,
+                    exc,
+                )
                 await asyncio.sleep(5)
             else:
                 raise
