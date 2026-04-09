@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r app/requirements.txt -r app/requirements-dev.txt
 
+      - name: Audit Python dependencies
+        run: pip-audit -r app/requirements.txt --desc on
+
       - name: Run tests
         env:
           DATABASE_HOST: localhost
