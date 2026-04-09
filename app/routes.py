@@ -13,6 +13,13 @@ logger = logging.getLogger("order_service.routes")
 
 router = APIRouter()
 
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "created": {"processing", "cancelled"},
+    "processing": {"completed", "cancelled"},
+    "completed": set(),
+    "cancelled": set(),
+}
+
 
 @router.post("/orders", response_model=Order, status_code=201,
              summary="Criar pedido (Create order)",
@@ -74,8 +81,12 @@ async def update_order_status(
     row = await db.get(OrderTable, str(order_id))
     if row is None:
         raise HTTPException(status_code=404, detail="Order not found")
-    if row.status == OrderStatus.cancelled.value:
-        raise HTTPException(status_code=400, detail="Cannot update a cancelled order")
+    allowed = ALLOWED_TRANSITIONS.get(row.status, set())
+    if payload.status.value not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transition from '{row.status}' to '{payload.status.value}'",
+        )
     row.status = payload.status.value
     await db.commit()
     logger.info(

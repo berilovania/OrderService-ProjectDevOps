@@ -158,3 +158,43 @@ async def test_request_id_preservado_quando_enviado():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/health", headers={"X-Request-ID": custom_id})
     assert response.headers["X-Request-ID"] == custom_id
+
+
+@pytest.mark.asyncio
+async def test_transicao_invalida_completed_para_processing():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Create order
+        payload = {"customer": "Transition Test", "items": ["item"], "total": 100.0}
+        create_resp = await client.post("/orders", json=payload)
+        order_id = create_resp.json()["id"]
+        # Move to processing
+        await client.patch(f"/orders/{order_id}/status", json={"status": "processing"})
+        # Move to completed
+        await client.patch(f"/orders/{order_id}/status", json={"status": "completed"})
+        # Try to go back to processing — should fail
+        response = await client.patch(f"/orders/{order_id}/status", json={"status": "processing"})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_transicao_invalida_completed_para_created():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Transition Test 2", "items": ["item"], "total": 50.0}
+        create_resp = await client.post("/orders", json=payload)
+        order_id = create_resp.json()["id"]
+        await client.patch(f"/orders/{order_id}/status", json={"status": "processing"})
+        await client.patch(f"/orders/{order_id}/status", json={"status": "completed"})
+        response = await client.patch(f"/orders/{order_id}/status", json={"status": "created"})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_transicao_valida_created_processing_completed():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Happy Path", "items": ["item"], "total": 200.0}
+        create_resp = await client.post("/orders", json=payload)
+        order_id = create_resp.json()["id"]
+        r1 = await client.patch(f"/orders/{order_id}/status", json={"status": "processing"})
+        r2 = await client.patch(f"/orders/{order_id}/status", json={"status": "completed"})
+    assert r1.status_code == 200
+    assert r2.status_code == 200
