@@ -33,7 +33,7 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
         "Order created",
         extra={
             "action": "create_order",
-            "order_id": order.id,
+            "order_id": str(order.id),
             "client_ip": "",
         },
     )
