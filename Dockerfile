@@ -15,6 +15,8 @@ COPY --from=builder /install /usr/local
 COPY app/ app/
 COPY favicon.ico .
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system --gid 1000 app && adduser --system --uid 1000 --ingroup app app
 USER app
 
