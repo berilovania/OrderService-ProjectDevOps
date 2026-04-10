@@ -358,7 +358,7 @@ Todo o tráfego externo passa por HTTPS. O certificado TLS é emitido automatica
 
 O endpoint `/metrics` é protegido em duas camadas:
 1. **Ingress** — bloqueado via `server-snippet` antes de chegar à aplicação
-2. **Aplicação** — aceita apenas IPs internos (loopback / RFC1918) para acesso direto via NodePort
+2. **Aplicação** — se `METRICS_TOKEN` estiver configurado, exige `Authorization: Bearer <token>`; caso contrário, restringe a IPs internos (loopback / RFC1918) como fallback para acesso direto via NodePort
 
 ### Container não-root
 
@@ -370,6 +370,22 @@ A imagem Docker roda como usuário `app` (UID 1000), não como root. Isso limita
 |---------|-------------|
 | **order-service** | `runAsNonRoot: true`, `runAsUser: 1000`, `readOnlyRootFilesystem: true`, `drop ALL capabilities`, `allowPrivilegeEscalation: false` |
 | **PostgreSQL** | `allowPrivilegeEscalation: false` |
+
+### Security headers
+
+Toda resposta HTTP inclui headers de segurança injetados pelo middleware `add_security_headers`:
+
+| Header | Valor |
+|--------|-------|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Content-Security-Policy` | `default-src 'self'` + exceções para Swagger UI (CDN) |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+
+### CORS
+
+O middleware CORS restringe origens aceitas via variável de ambiente `CORS_ALLOWED_ORIGINS` (lista separada por vírgula). Se não configurada, nenhuma origem é permitida (política restritiva por padrão).
 
 ### Proteção contra XSS
 
@@ -409,7 +425,7 @@ Acesse:
 - **Métricas:** http://localhost:8000/metrics
 - **Health check:** http://localhost:8000/health
 - **Prometheus:** http://localhost:9090
-- **Grafana:** http://localhost:3000 (usuário: `admin` / senha: `admin`)
+- **Grafana:** http://localhost:3000 (usuário: `admin` / senha: definida em `GF_ADMIN_PASSWORD` no `.env`)
 
 ### Opção 2 — Docker (imagem avulsa)
 
