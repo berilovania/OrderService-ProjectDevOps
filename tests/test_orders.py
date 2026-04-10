@@ -207,3 +207,15 @@ async def test_health_nao_expoe_detalhes_do_banco():
     data = response.json()
     assert "database" not in data
     assert data["status"] == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_cancelar_pedido_completed_rejeitado():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        payload = {"customer": "Cancel Test", "items": ["item"], "total": 100.0}
+        create_resp = await client.post("/orders", json=payload)
+        order_id = create_resp.json()["id"]
+        await client.patch(f"/orders/{order_id}/status", json={"status": "processing"})
+        await client.patch(f"/orders/{order_id}/status", json={"status": "completed"})
+        response = await client.delete(f"/orders/{order_id}")
+    assert response.status_code == 400

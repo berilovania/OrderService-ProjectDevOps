@@ -107,6 +107,12 @@ async def cancel_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
     row = await db.get(OrderTable, str(order_id))
     if row is None:
         raise HTTPException(status_code=404, detail="Order not found")
+    allowed = ALLOWED_TRANSITIONS.get(row.status, set())
+    if OrderStatus.cancelled.value not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transition from '{row.status}' to 'cancelled'",
+        )
     row.status = OrderStatus.cancelled.value
     await db.commit()
     logger.info(
