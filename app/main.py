@@ -125,11 +125,11 @@ async def health():
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        return {"status": "healthy", "database": "connected"}
+        return {"status": "healthy"}
     except Exception:
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "database": "disconnected"},
+            content={"status": "unhealthy"},
         )
 
 

@@ -198,3 +198,12 @@ async def test_transicao_valida_created_processing_completed():
         r2 = await client.patch(f"/orders/{order_id}/status", json={"status": "completed"})
     assert r1.status_code == 200
     assert r2.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_health_nao_expoe_detalhes_do_banco():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/health")
+    data = response.json()
+    assert "database" not in data
+    assert data["status"] == "healthy"
