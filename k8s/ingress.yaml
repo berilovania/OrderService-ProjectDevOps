@@ -6,9 +6,8 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/limit-rps: "10"
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
-    nginx.ingress.kubernetes.io/server-snippet: |
-      location /metrics {
-        deny all;
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($uri = /metrics) {
         return 403;
       }
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
