@@ -22,27 +22,18 @@ spec:
         - name: ghcr-secret
       initContainers:
         - name: wait-for-postgres
-          image: postgres:16-alpine
+          image: busybox:1.37
           command:
             - sh
             - -c
             - |
-              until pg_isready -h postgres -p 5432 -U orders; do
+              until nc -z postgres 5432; do
                 echo "Waiting for postgres..."; sleep 3;
               done
               echo "Postgres is up"
-          env:
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_PASSWORD
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
-          volumeMounts:
-            - name: tmp-dir
-              mountPath: /tmp
       containers:
         - name: order-service
           image: ghcr.io/__GITHUB_USER__/__IMAGE_NAME__:latest
