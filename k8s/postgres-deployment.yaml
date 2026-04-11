@@ -24,12 +24,29 @@ spec:
         runAsNonRoot: true
         runAsUser: 999
         fsGroup: 999
+      initContainers:
+        - name: init-permissions
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/lib/postgresql/data/pgdata
+              chown -R 999:999 /var/lib/postgresql/data
+              chmod 700 /var/lib/postgresql/data/pgdata
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
       containers:
         - name: postgres
           image: postgres:16-alpine
           ports:
             - containerPort: 5432
           env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -45,6 +62,8 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+            - name: postgres-run
+              mountPath: /var/run/postgresql
             - name: postgres-secret-vol
               mountPath: /run/secrets/postgres
               readOnly: true
@@ -64,6 +83,8 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: postgres-run
+          emptyDir: {}
         - name: postgres-secret-vol
           secret:
             secretName: postgres-secret

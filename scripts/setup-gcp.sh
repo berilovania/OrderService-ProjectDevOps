@@ -130,6 +130,7 @@ sed -i "s|__IMAGE_NAME__|${IMAGE_NAME}|g" k8s/deployment.yaml
 
 sed -i "s|__DOMAIN__|${DOMAIN}|g" k8s/ingress.yaml
 sed -i "s|__ACME_EMAIL__|${ACME_EMAIL}|g" k8s/clusterissuer.yaml
+sed -i "s|__DOMAIN__|${DOMAIN}|g" k8s/monitoring/grafana-deployment.yaml
 
 echo "==> Pre-pulling images to avoid memory spike during pod startup..."
 sudo k3s crictl pull postgres:16-alpine
@@ -137,6 +138,7 @@ echo "  postgres:16-alpine cached."
 
 echo "==> Applying Kubernetes manifests..."
 kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/network-policy.yaml
 kubectl apply -f k8s/postgres-pvc.yaml
 # Migrate from Deployment to StatefulSet (one-time, safe to repeat)
 kubectl delete deployment postgres -n order-service --ignore-not-found
@@ -158,7 +160,14 @@ for i in $(seq 1 36); do
   sleep 5
 done
 
-sleep 10
+echo "==> Waiting for PostgreSQL to accept connections..."
+for i in $(seq 1 30); do
+  if kubectl exec -n order-service postgres-0 -- pg_isready -U orders -q 2>/dev/null; then
+    echo "  PostgreSQL ready after ${i}x2s"
+    break
+  fi
+  sleep 2
+done
 
 echo "==> Applying app deployment..."
 kubectl apply -f k8s/deployment.yaml
@@ -171,11 +180,27 @@ for i in $(seq 1 60); do
   sleep 5
 done
 
+echo "==> Deploying monitoring stack..."
+kubectl apply -f k8s/monitoring/namespace.yaml
+kubectl apply -f k8s/monitoring/network-policy.yaml
+kubectl apply -f k8s/monitoring/prometheus-config.yaml
+kubectl apply -f k8s/monitoring/prometheus-deployment.yaml
+kubectl apply -f k8s/monitoring/prometheus-service.yaml
+kubectl apply -f k8s/monitoring/grafana-datasource.yaml
+kubectl apply -f k8s/monitoring/grafana-dashboard-provider.yaml
+kubectl apply -f k8s/monitoring/grafana-dashboard.yaml
+kubectl apply -f k8s/monitoring/grafana-deployment.yaml
+kubectl apply -f k8s/monitoring/grafana-service.yaml
+kubectl apply -f k8s/grafana-externalname-service.yaml
+kubectl rollout status deployment/prometheus -n monitoring --timeout=120s
+kubectl rollout status deployment/grafana -n monitoring --timeout=120s
+
 echo ""
 echo "==> Setup complete!"
 echo "    Test (NodePort): curl http://localhost:30080/health"
 echo "    Test (HTTPS):    curl https://${DOMAIN}/health"
 echo "    Swagger:         https://${DOMAIN}/docs"
+echo "    Grafana:         https://${DOMAIN}/grafana (admin / ${GRAFANA_PASSWORD})"
 echo ""
 echo "    NOTE: TLS cert may take 1-2 minutes to issue after DNS propagates."
 echo "    Check cert status: kubectl describe certificate order-service-tls -n order-service"

@@ -103,6 +103,7 @@ echo "  postgres:16-alpine cached."
 
 echo "==> Applying Kubernetes manifests..."
 kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/network-policy.yaml
 kubectl apply -f k8s/postgres-pvc.yaml
 # Migrate from Deployment to StatefulSet (one-time, safe to repeat)
 kubectl delete deployment postgres -n order-service --ignore-not-found
@@ -118,7 +119,14 @@ for i in $(seq 1 36); do
   sleep 5
 done
 
-sleep 10
+echo "==> Waiting for PostgreSQL to accept connections..."
+for i in $(seq 1 30); do
+  if kubectl exec -n order-service postgres-0 -- pg_isready -U orders -q 2>/dev/null; then
+    echo "  PostgreSQL ready after ${i}x2s"
+    break
+  fi
+  sleep 2
+done
 
 echo "==> Applying app deployment..."
 kubectl apply -f k8s/deployment.yaml
@@ -131,7 +139,22 @@ for i in $(seq 1 60); do
   sleep 5
 done
 
+echo "==> Deploying monitoring stack..."
+kubectl apply -f k8s/monitoring/namespace.yaml
+kubectl apply -f k8s/monitoring/network-policy.yaml
+kubectl apply -f k8s/monitoring/prometheus-config.yaml
+kubectl apply -f k8s/monitoring/prometheus-deployment.yaml
+kubectl apply -f k8s/monitoring/prometheus-service.yaml
+kubectl apply -f k8s/monitoring/grafana-datasource.yaml
+kubectl apply -f k8s/monitoring/grafana-dashboard-provider.yaml
+kubectl apply -f k8s/monitoring/grafana-dashboard.yaml
+kubectl apply -f k8s/monitoring/grafana-deployment.yaml
+kubectl apply -f k8s/monitoring/grafana-service.yaml
+kubectl rollout status deployment/prometheus -n monitoring --timeout=120s
+kubectl rollout status deployment/grafana -n monitoring --timeout=120s
+
 echo ""
 echo "==> Setup complete!"
 echo "    Test: curl http://localhost:30080/health"
 echo "    Swagger: http://<EC2_PUBLIC_IP>:30080/docs"
+echo "    Grafana: http://<EC2_PUBLIC_IP>:30080/grafana (admin / ${GRAFANA_PASSWORD})"
