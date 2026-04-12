@@ -27,7 +27,7 @@ spec:
             - sh
             - -c
             - |
-              until nc -z postgres 5432; do
+              until nc -w 1 postgres 5432 </dev/null 2>/dev/null; do
                 echo "Waiting for postgres..."; sleep 3;
               done
               echo "Postgres is up"
