@@ -36,6 +36,7 @@ spec:
               chmod 700 /var/lib/postgresql/data/pgdata
           securityContext:
             runAsUser: 0
+            runAsNonRoot: false
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
