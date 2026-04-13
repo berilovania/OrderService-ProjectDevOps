@@ -555,7 +555,6 @@ O que acontece automaticamente após um `git push origin main`:
 | **Infrastructure as Code** | Provisionar a VM GCP com Terraform em vez de setup manual |
 | **GitOps com ArgoCD** | Substituir o deploy via SSH por reconciliação declarativa com ArgoCD |
 | **Alertas** | Configurar Alertmanager para notificações em caso de falha nos pods ou métricas anômalas |
-| **NetworkPolicy** | Restringir comunicação entre pods — permitir apenas order-service → postgres |
 
 ---
 
@@ -622,6 +621,52 @@ bash scripts/setup-gcp.sh <GITHUB_USER>
 O `kubectl apply` tenta baixar o schema OpenAPI do cluster para validar os manifests, o que pode sobrecarregar o API server em instâncias com pouca RAM.
 
 **Solução:** reiniciar o k3s para liberar memória (ver seção acima). O pipeline usa validação habilitada para garantir que manifests incorretos sejam detectados antes do deploy.
+
+---
+
+### Certificado TLS não emitido — "Fake Certificate" no navegador
+
+O NGINX exibe um certificado autoassinado ("Kubernetes Ingress Controller Fake Certificate") quando o cert-manager não consegue completar o desafio HTTP-01 do Let's Encrypt.
+
+**Diagnóstico:**
+```bash
+kubectl logs -n cert-manager deployment/cert-manager --tail=50
+kubectl get certificate,certificaterequest,challenge -n order-service
+curl -v http://<DOMINIO>/.well-known/acme-challenge/
+```
+
+**Causa 1 — NetworkPolicy bloqueando o solver pod**
+
+O `default-deny` do namespace `order-service` bloqueia o tráfego do NGINX para o pod solver do cert-manager (porta 8089). Sintoma nos logs: `wrong status code '502', expected '200'`.
+
+Verifique se a policy `allow-acme-solver-ingress` existe:
+```bash
+kubectl get networkpolicy -n order-service
+```
+
+Se não existir, aplique:
+```bash
+kubectl apply -f k8s/network-policy.yaml
+```
+
+**Causa 2 — `ssl-redirect: true` causando loop 308**
+
+Com o redirect ativo, o NGINX redireciona o challenge HTTP → HTTPS antes que o Let's Encrypt consiga validar. Como o certificado ainda não existe, cria-se um deadlock.
+
+Verifique o redirect:
+```bash
+curl -v http://<DOMINIO>/.well-known/acme-challenge/
+# NÃO deve retornar 308
+```
+
+O ingress tem `ssl-redirect: "false"` intencionalmente — não reative.
+
+**Forçar novo ciclo de emissão após corrigir:**
+```bash
+kubectl delete certificate order-service-tls -n order-service
+kubectl get certificate -n order-service -w
+# Aguarde READY=True
+```
 
 ---
 
