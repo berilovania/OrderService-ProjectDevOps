@@ -10,7 +10,6 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 
 from .dashboard import get_dashboard_html
 from .database import engine, init_db, async_session
-from .docs_page import get_docs_html
 from .metrics import instrumentator
 from .routes import router
 
@@ -58,7 +57,6 @@ app = FastAPI(
     title="Order Service",
     description="API REST para gerenciamento de pedidos (Order management REST API) | Projeto DevOps",
     version="2.0.0",
-    docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
 )
@@ -102,11 +100,6 @@ async def add_request_id(request: Request, call_next):
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def root():
     return get_dashboard_html()
-
-
-@app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
-def docs():
-    return get_docs_html()
 
 
 @app.get("/favicon.ico", include_in_schema=False)

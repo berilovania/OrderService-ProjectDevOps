@@ -503,7 +503,6 @@ O que acontece automaticamente após um `git push origin main`:
 │   ├── db_models.py                # Modelo ORM mapeando a tabela orders
 │   ├── metrics.py                  # Configuração do Prometheus
 │   ├── dashboard.py                # HTML do dashboard interativo (/)
-│   ├── docs_page.py                # HTML do Swagger UI customizado (/docs)
 │   ├── requirements.txt            # Dependências de produção
 │   └── requirements-dev.txt        # Dependências de desenvolvimento (pytest, httpx)
 │
