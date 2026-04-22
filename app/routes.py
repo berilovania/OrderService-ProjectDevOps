@@ -21,9 +21,7 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
-@router.post("/orders", response_model=Order, status_code=201,
-             summary="Criar pedido (Create order)",
-             description="Cria um novo pedido no sistema (Creates a new order)")
+@router.post("/orders", response_model=Order, status_code=201)
 async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db)):
     order = Order(**payload.model_dump())
     row = OrderTable(
@@ -47,9 +45,7 @@ async def create_order(payload: OrderCreate, db: AsyncSession = Depends(get_db))
     return order
 
 
-@router.get("/orders", response_model=list[Order],
-            summary="Listar pedidos (List orders)",
-            description="Retorna todos os pedidos com paginação (Returns all orders with pagination)")
+@router.get("/orders", response_model=list[Order])
 async def list_orders(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -62,9 +58,7 @@ async def list_orders(
     return [_row_to_order(r) for r in rows]
 
 
-@router.get("/orders/{order_id}", response_model=Order,
-            summary="Buscar pedido (Get order)",
-            description="Busca um pedido pelo ID (Gets an order by ID)")
+@router.get("/orders/{order_id}", response_model=Order)
 async def get_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
     row = await db.get(OrderTable, str(order_id))
     if row is None:
@@ -72,9 +66,7 @@ async def get_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
     return _row_to_order(row)
 
 
-@router.patch("/orders/{order_id}/status", response_model=Order,
-              summary="Atualizar status (Update status)",
-              description="Atualiza o status de um pedido (Updates an order status)")
+@router.patch("/orders/{order_id}/status", response_model=Order)
 async def update_order_status(
     order_id: UUID, payload: StatusUpdate, db: AsyncSession = Depends(get_db)
 ):
@@ -100,9 +92,7 @@ async def update_order_status(
     return _row_to_order(row)
 
 
-@router.delete("/orders/{order_id}", response_model=Order,
-               summary="Cancelar pedido (Cancel order)",
-               description="Cancela um pedido existente (Cancels an existing order)")
+@router.delete("/orders/{order_id}", response_model=Order)
 async def cancel_order(order_id: UUID, db: AsyncSession = Depends(get_db)):
     row = await db.get(OrderTable, str(order_id))
     if row is None:

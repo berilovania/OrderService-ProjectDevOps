@@ -156,5 +156,4 @@ kubectl rollout status deployment/grafana -n monitoring --timeout=120s
 echo ""
 echo "==> Setup complete!"
 echo "    Test: curl http://localhost:30080/health"
-echo "    Swagger: http://<EC2_PUBLIC_IP>:30080/docs"
 echo "    Grafana: http://<EC2_PUBLIC_IP>:30080/grafana (admin / ${GRAFANA_PASSWORD})"

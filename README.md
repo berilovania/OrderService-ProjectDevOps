@@ -379,7 +379,7 @@ Toda resposta HTTP inclui headers de segurança injetados pelo middleware `add_s
 |--------|-------|
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
-| `Content-Security-Policy` | `default-src 'self'` + exceções para Swagger UI (CDN) |
+| `Content-Security-Policy` | `default-src 'self'` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
 
@@ -421,7 +421,6 @@ docker compose up
 
 Acesse:
 - **Dashboard:** http://localhost:8000
-- **API Docs:** http://localhost:8000/docs
 - **Métricas:** http://localhost:8000/metrics
 - **Health check:** http://localhost:8000/health
 - **Prometheus:** http://localhost:9090

@@ -54,9 +54,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Order Service",
-    description="API REST para gerenciamento de pedidos (Order management REST API) | Projeto DevOps",
-    version="2.0.0",
+    openapi_url=None,
+    docs_url=None,
     redoc_url=None,
     lifespan=lifespan,
 )
@@ -78,7 +77,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "font-src 'self' data:"
